@@ -67,7 +67,7 @@ class _ScanRunnable(QRunnable):
                 continue
 
             cached = self._cache.get(path)
-            if cached and abs(cached.get("mtime", 0) - mtime) < 1:
+            if cached and abs(cached.get("mtime", 0) - mtime) < 1 and "track_number" in cached:
                 md = TrackMetadata(
                     path=path,
                     title=cached.get("title", ""),
@@ -76,6 +76,7 @@ class _ScanRunnable(QRunnable):
                     duration_ms=int(cached.get("duration_ms", 0)),
                     sample_rate=int(cached.get("sample_rate", 0)),
                     bits_per_sample=int(cached.get("bits_per_sample", 0)),
+                    track_number=int(cached.get("track_number", 0)),
                 )
             else:
                 try:
@@ -224,6 +225,7 @@ class Library(QObject):
                 "duration_ms": t.duration_ms,
                 "sample_rate": t.sample_rate,
                 "bits_per_sample": t.bits_per_sample,
+                "track_number": t.track_number,
                 "mtime": mtime,
             }
         return cache
@@ -249,6 +251,7 @@ class Library(QObject):
                 duration_ms=int(entry.get("duration_ms", 0)),
                 sample_rate=int(entry.get("sample_rate", 0)),
                 bits_per_sample=int(entry.get("bits_per_sample", 0)),
+                track_number=int(entry.get("track_number", 0)),
             ))
 
     def _save_cache(self) -> None:
@@ -265,6 +268,7 @@ class Library(QObject):
                         "duration_ms": t.duration_ms,
                         "sample_rate": t.sample_rate,
                         "bits_per_sample": t.bits_per_sample,
+                        "track_number": t.track_number,
                         "mtime": _safe_mtime(t.path),
                     }
                     for t in self._tracks

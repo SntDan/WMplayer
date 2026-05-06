@@ -210,6 +210,9 @@ class AlbumsPanel(QWidget):
                 self._albums_tracks[album] = []
             self._albums_tracks[album].append(t)
         
+        for tracks in self._albums_tracks.values():
+            tracks.sort(key=lambda t: (t.track_number if t.track_number > 0 else 9999, t.title))
+
         self.list_albums.clear()
         albums = sorted(self._albums_tracks.keys())
         for a in albums:

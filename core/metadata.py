@@ -33,6 +33,7 @@ class TrackMetadata:
     duration_ms: int = 0
     sample_rate: int = 0          # Hz, 例如 44100 / 48000 / 96000
     bits_per_sample: int = 0      # bit, 例如 16 / 24 / 32 (有些有损格式无此字段时为 0)
+    track_number: int = 0         # 专辑内曲目序号,0 表示未知
     cover: Optional[bytes] = field(default=None, repr=False)
 
     @property
@@ -95,6 +96,12 @@ def read_metadata(path: str, with_cover: bool = True) -> TrackMetadata:
             md.artist = artist
         if album:
             md.album = album
+        track_raw = _first_tag(audio, ["TRCK", "tracknumber", "TRACKNUMBER", "trkn", "WM/TrackNumber"])
+        if track_raw:
+            try:
+                md.track_number = int(str(track_raw).split("/")[0].strip())
+            except (ValueError, TypeError):
+                pass
     except Exception:
         pass
 
