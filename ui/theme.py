@@ -1,0 +1,133 @@
+"""
+主题模块
+========
+集中管理颜色 / 字号 / 间距,方便后续切换皮肤。
+"""
+
+from PyQt6.QtGui import QColor
+
+
+class Theme:
+    # 与草图一致:黑底,白色为布局/文字,红色为按钮
+    BG = QColor("#000000")
+    PANEL_BG = QColor("#000000")
+    BORDER = QColor("#FFFFFF")
+    TEXT = QColor("#FFFFFF")
+    TEXT_DIM = QColor("#9E9E9E")
+    ACCENT = QColor("#E63946")           # 红色 - 功能性按钮
+    ACCENT_HOVER = QColor("#FF5A66")
+    PROGRESS_BG = QColor("#3A3A3A")
+    PROGRESS_FG = QColor("#FFFFFF")
+    LIST_HIGHLIGHT = QColor("#1F1F1F")
+    LIST_SELECTED = QColor("#2C2C2C")
+    LIST_PLAYING = QColor("#E63946")
+
+
+GLOBAL_QSS = """
+QWidget {
+    background-color: #000000;
+    color: #FFFFFF;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    font-size: 13px;
+}
+
+QToolTip {
+    background-color: #1F1F1F;
+    color: #FFFFFF;
+    border: 1px solid #333333;
+    padding: 4px 8px;
+}
+
+QListWidget {
+    background-color: #000000;
+    border: 1px solid #FFFFFF;
+    border-style: solid;
+    border-color: #FFFFFF;
+    border-width: 1px;
+    outline: 0;
+    padding: 4px;
+}
+QListWidget::item {
+    padding: 8px 10px;
+    border-radius: 4px;
+    margin-bottom: 2px;
+}
+QListWidget::item:hover {
+    background-color: #1F1F1F;
+}
+QListWidget::item:selected {
+    background-color: #2C2C2C;
+    color: #FFFFFF;
+}
+
+QScrollBar:vertical {
+    background: transparent;
+    width: 8px;
+    margin: 4px 0;
+}
+QScrollBar::handle:vertical {
+    background: #444444;
+    border-radius: 4px;
+    min-height: 24px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #666666;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0;
+    background: transparent;
+}
+
+QPushButton {
+    background: transparent;
+    border: none;
+    color: #FFFFFF;
+}
+QPushButton:hover {
+    color: #FF5A66;
+}
+
+QSlider::groove:horizontal {
+    height: 4px;
+    background: #3A3A3A;
+    border-radius: 2px;
+}
+QSlider::sub-page:horizontal {
+    background: #FFFFFF;
+    border-radius: 2px;
+}
+QSlider::handle:horizontal {
+    background: #FFFFFF;
+    width: 12px;
+    height: 12px;
+    margin: -4px 0;
+    border-radius: 6px;
+}
+QSlider::handle:horizontal:hover {
+    background: #FF5A66;
+}
+
+QDialog {
+    background-color: #0a0a0a;
+}
+QLineEdit, QSpinBox, QComboBox {
+    background-color: #1a1a1a;
+    border: 1px solid #333333;
+    padding: 4px 6px;
+    border-radius: 3px;
+}
+QCheckBox {
+    spacing: 8px;
+}
+QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+    border: 1px solid #555555;
+    border-radius: 3px;
+    background: #0a0a0a;
+}
+QCheckBox::indicator:checked {
+    background: #E63946;
+    border: 1px solid #E63946;
+}
+"""
