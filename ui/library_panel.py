@@ -25,7 +25,8 @@ from PyQt6.QtWidgets import (
 )
 
 from core.library import Library
-from core.metadata import TrackMetadata
+from core.thumbnails import thumb_path_for
+from ui.list_delegates import CoverRowDelegate, ROLE_SUBTITLE, ROLE_THUMB_PATH
 
 
 class LibraryPanel(QWidget):
@@ -90,6 +91,9 @@ class LibraryPanel(QWidget):
         self.list.setUniformItemSizes(True)
         self.list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.list.setMouseTracking(True)
+        self._row_delegate = CoverRowDelegate(self.list)
+        self.list.setItemDelegate(self._row_delegate)
         outer.addWidget(self.list, 1)
 
     def _wire(self) -> None:
@@ -108,16 +112,14 @@ class LibraryPanel(QWidget):
     def refresh(self) -> None:
         self.list.clear()
         tracks = self._library.tracks
-        for i, t in enumerate(tracks):
-            it = QListWidgetItem(self._format(t))
+        for t in tracks:
+            it = QListWidgetItem(t.title or "")
             it.setData(Qt.ItemDataRole.UserRole, t.path)
+            it.setData(ROLE_THUMB_PATH, thumb_path_for(t.path))
+            it.setData(ROLE_SUBTITLE, t.artist or "")
             self.list.addItem(it)
         self.count_label.setText(f"{len(tracks)} 首")
         self._apply_filter(self.search.text())
-
-    @staticmethod
-    def _format(t: TrackMetadata) -> str:
-        return f"{t.title}  —  {t.artist}  ·  {t.album}"
 
     # ------------------------------------------------------------------
     # 扫描

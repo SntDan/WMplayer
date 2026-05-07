@@ -19,6 +19,7 @@ from typing import Dict, List, Optional
 from PyQt6.QtCore import QObject, QRunnable, QThreadPool, pyqtSignal
 
 from core.metadata import TrackMetadata, is_supported, read_metadata
+from core.thumbnails import ensure_thumb, thumb_exists
 
 
 # ----------------------------------------------------------------------
@@ -67,6 +68,8 @@ class _ScanRunnable(QRunnable):
                 continue
 
             cached = self._cache.get(path)
+            need_thumb = not thumb_exists(path)
+
             if cached and abs(cached.get("mtime", 0) - mtime) < 1 and "track_number" in cached:
                 md = TrackMetadata(
                     path=path,
@@ -78,9 +81,18 @@ class _ScanRunnable(QRunnable):
                     bits_per_sample=int(cached.get("bits_per_sample", 0)),
                     track_number=int(cached.get("track_number", 0)),
                 )
+                if need_thumb:
+                    try:
+                        cover_md = read_metadata(path, with_cover=True)
+                        ensure_thumb(path, cover_md.cover)
+                    except Exception:
+                        pass
             else:
                 try:
-                    md = read_metadata(path, with_cover=False)
+                    md = read_metadata(path, with_cover=need_thumb)
+                    if need_thumb:
+                        ensure_thumb(path, md.cover)
+                        md.cover = None
                 except Exception:
                     continue
             results.append(md)

@@ -38,6 +38,7 @@ from core.config import (
     LIBRARY_CACHE_PATH, QUEUE_CACHE_PATH, QUEUE_ORIGINAL_CACHE_PATH,
     default_library_dir, default_playlists_dir,
 )
+from core.thumbnails import THUMB_DIR
 
 
 _BTN_QSS = (
@@ -234,6 +235,14 @@ class SettingsDialog(QDialog):
                     os.remove(path)
             except Exception:
                 pass
+
+        # 清空整个缩略图目录
+        try:
+            if os.path.isdir(THUMB_DIR):
+                import shutil
+                shutil.rmtree(THUMB_DIR, ignore_errors=True)
+        except Exception:
+            pass
 
         for key, value in DEFAULT_CONFIG.items():
             self._config.set(key, value)

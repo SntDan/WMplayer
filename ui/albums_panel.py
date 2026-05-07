@@ -7,6 +7,8 @@ from PyQt6.QtWidgets import (
 )
 from core.library import Library
 from core.metadata import TrackMetadata
+from core.thumbnails import thumb_path_for
+from ui.list_delegates import CoverRowDelegate, ROLE_SUBTITLE, ROLE_THUMB_PATH
 
 class ElidedLabel(QLabel):
     def __init__(self, text: str = "", parent: Optional[QWidget] = None) -> None:
@@ -122,6 +124,11 @@ class AlbumsPanel(QWidget):
         self.list_albums = QListWidget()
         self.list_albums.setTextElideMode(Qt.TextElideMode.ElideRight)
         self.list_albums.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.list_albums.setUniformItemSizes(True)
+        self.list_albums.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
+        self.list_albums.setMouseTracking(True)
+        self._album_delegate = CoverRowDelegate(self.list_albums)
+        self.list_albums.setItemDelegate(self._album_delegate)
         l0.addWidget(self.list_albums)
         
         if self._embedded:
@@ -170,6 +177,11 @@ class AlbumsPanel(QWidget):
         self.list_tracks = QListWidget()
         self.list_tracks.setTextElideMode(Qt.TextElideMode.ElideRight)
         self.list_tracks.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.list_tracks.setUniformItemSizes(True)
+        self.list_tracks.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
+        self.list_tracks.setMouseTracking(True)
+        self._track_delegate = CoverRowDelegate(self.list_tracks)
+        self.list_tracks.setItemDelegate(self._track_delegate)
         l1.addWidget(self.list_tracks)
         
         h_back = QHBoxLayout()
@@ -218,6 +230,10 @@ class AlbumsPanel(QWidget):
         for a in albums:
             it = QListWidgetItem(a)
             it.setData(Qt.ItemDataRole.UserRole, a)
+            tracks = self._albums_tracks.get(a, [])
+            if tracks:
+                it.setData(ROLE_THUMB_PATH, thumb_path_for(tracks[0].path))
+                it.setData(ROLE_SUBTITLE, tracks[0].artist or "")
             self.list_albums.addItem(it)
             
         if self._embedded and self._filter_artist:
@@ -295,6 +311,8 @@ class AlbumsPanel(QWidget):
         for t in tracks:
             it = QListWidgetItem(t.title)
             it.setData(Qt.ItemDataRole.UserRole, t.path)
+            it.setData(ROLE_THUMB_PATH, thumb_path_for(t.path))
+            it.setData(ROLE_SUBTITLE, t.artist or "")
             self.list_tracks.addItem(it)
             
         self.stack.setCurrentIndex(1)
