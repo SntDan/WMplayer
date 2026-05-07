@@ -23,6 +23,22 @@ class Theme:
     LIST_PLAYING = QColor("#E63946")
 
 
+# 共用按钮样式(深色面板上的次级按钮: 添加文件夹/扫描/浏览…等)
+BTN_QSS = (
+    "QPushButton{background:#1a1a1a; border:1px solid #333; "
+    "padding:4px 10px; border-radius:4px; color:#FFF;}"
+    "QPushButton:hover{background:#2a2a2a; border-color:#E63946;}"
+    "QPushButton:disabled{color:#555;}"
+)
+
+# 红底主操作按钮(返回/播放全部/确定 等)
+PRIMARY_BTN_QSS = (
+    "QPushButton{background:#E63946; color:#FFF; border:none; "
+    "padding:6px 12px; border-radius:4px; font-weight:bold;}"
+    "QPushButton:hover{background:#d62828;}"
+)
+
+
 GLOBAL_QSS = """
 QWidget {
     background-color: #000000;

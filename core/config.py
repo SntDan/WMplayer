@@ -71,9 +71,13 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 }
 
 
+_MISSING = object()
+
+
 class Config:
     def __init__(self) -> None:
         self._data: Dict[str, Any] = dict(DEFAULT_CONFIG)
+        self._factory_reset_pending: bool = False
         self.load()
 
     def load(self) -> None:
@@ -93,15 +97,27 @@ class Config:
         except Exception:
             pass
 
-    def get(self, key: str, default: Any = None) -> Any:
+    def get(self, key: str, default: Any = _MISSING) -> Any:
         if key in self._data:
             return self._data[key]
-        if default is not None:
+        if default is not _MISSING:
             return default
         return DEFAULT_CONFIG.get(key)
 
     def set(self, key: str, value: Any) -> None:
         self._data[key] = value
+
+    def has(self, key: str) -> bool:
+        return key in self._data
+
+    # 工厂重置: 由 SettingsDialog 触发, 由 MainWindow.closeEvent 检查。
+    # 标志为 True 时, closeEvent 应跳过状态保存(否则会立刻把队列写回缓存)。
+    def mark_factory_reset(self) -> None:
+        self._factory_reset_pending = True
+
+    @property
+    def factory_reset_pending(self) -> bool:
+        return self._factory_reset_pending
 
     def library_folders_effective(self) -> List[str]:
         """实际生效的曲库根目录(用户自定义 + 默认 library/)。"""

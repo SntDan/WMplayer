@@ -24,6 +24,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ui.theme import BTN_QSS as _BTN_QSS
+
 from core.metadata import TrackMetadata
 from core.playlist import Playlist
 from .theme import Theme
@@ -189,10 +191,3 @@ class QueuePanel(QWidget):
                 continue
             hay = f"{t.title} {t.artist} {t.album} {t.filename}".lower()
             item.setHidden(text not in hay)
-
-
-_BTN_QSS = (
-    "QPushButton{background:#1a1a1a; border:1px solid #333; "
-    "padding:4px 10px; border-radius:4px; color:#FFF;}"
-    "QPushButton:hover{background:#2a2a2a; border-color:#E63946;}"
-)

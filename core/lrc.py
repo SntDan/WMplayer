@@ -175,19 +175,18 @@ def find_lrc_for(audio_path: str) -> Optional[str]:
     stem = os.path.splitext(os.path.basename(audio_path))[0]
     if not folder or not stem:
         return None
-    # 优先精确匹配
-    for ext in (".lrc", ".LRC", ".Lrc"):
-        cand = os.path.join(folder, stem + ext)
-        if os.path.isfile(cand):
-            return cand
-    # 再尝试大小写不敏感扫描(同目录下找一个 stem 相同的 .lrc)
+    # 优先精确匹配(常见情况,免去 listdir)
+    cand = os.path.join(folder, stem + ".lrc")
+    if os.path.isfile(cand):
+        return cand
+    # 大小写不敏感扫描(同目录下找一个 stem 相同的 .lrc)
     if os.path.isdir(folder):
         try:
             stem_lower = stem.lower()
             for fname in os.listdir(folder):
-                if fname.lower().endswith(".lrc"):
-                    if os.path.splitext(fname)[0].lower() == stem_lower:
-                        return os.path.join(folder, fname)
+                if fname.lower().endswith(".lrc") and \
+                        os.path.splitext(fname)[0].lower() == stem_lower:
+                    return os.path.join(folder, fname)
         except OSError:
             pass
     return None

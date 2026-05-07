@@ -57,6 +57,16 @@ class _LyricsCanvas(QWidget):
         # 文字两侧内边距(避免顶到面板边缘)
         self._text_margin = 24
 
+        # 高度缓存:_block_height/_block_top 是 hot path,200+ 行歌词逐帧计算
+        # 累加是 O(n²),用累计偏移表把 _block_top 降到 O(1)。
+        # _heights[i] = 第 i 行的高度;_offsets[i] = 第 0..i-1 行高度的累计和。
+        # _height_cache_key 记录 (lyrics 引用, 当前行 idx, 画布宽度) 三元组,
+        # 任一项变化时整张表重建。
+        self._heights: list[float] = []
+        self._offsets: list[float] = []
+        self._total_height: float = 0.0
+        self._height_cache_key: tuple = (None, -1, -1)
+
         # 拖动状态
         self._drag_start_y: Optional[float] = None
         self._drag_start_scroll: float = 0.0
@@ -119,31 +129,48 @@ class _LyricsCanvas(QWidget):
     def _font_for(self, index: int) -> QFont:
         return self._font_active if (self._synced and index == self._current_index) else self._font
 
-    def _block_height(self, index: int) -> float:
-        """第 index 行歌词在当前宽度下绘制后的实际高度(已带行间距)。"""
-        if self._lyrics is None or not (0 <= index < len(self._lyrics)):
-            return 0.0
-        text = self._lyrics.lines[index].text
-        if not text:
-            return 0.0
-        font = self._font_for(index)
-        fm = QFontMetrics(font)
+    def _ensure_heights(self) -> None:
+        """按需重建累计高度表;只在 (lyrics, current_index, width) 三者改变时执行。"""
+        key = (id(self._lyrics) if self._lyrics else None, self._current_index, self.width())
+        if key == self._height_cache_key:
+            return
+        self._height_cache_key = key
+        self._heights = []
+        self._offsets = []
+        if self._lyrics is None:
+            self._total_height = 0.0
+            return
+
         max_w = max(50, self.width() - 2 * self._text_margin)
-        # 用 boundingRect 算 wrap 后的高度
         flags = int(Qt.TextFlag.TextWordWrap) | int(Qt.AlignmentFlag.AlignHCenter)
-        rect = fm.boundingRect(QRect(0, 0, int(max_w), 10000), flags, text)
-        # 加 row gap
-        return rect.height() + self._row_gap
+        fm_normal = QFontMetrics(self._font)
+        fm_active = QFontMetrics(self._font_active)
+
+        acc = 0.0
+        for i, line in enumerate(self._lyrics.lines):
+            self._offsets.append(acc)
+            text = line.text
+            if not text:
+                self._heights.append(0.0)
+                continue
+            fm = fm_active if (self._synced and i == self._current_index) else fm_normal
+            rect = fm.boundingRect(QRect(0, 0, int(max_w), 10000), flags, text)
+            h = float(rect.height() + self._row_gap)
+            self._heights.append(h)
+            acc += h
+        self._total_height = acc
+
+    def _block_height(self, index: int) -> float:
+        self._ensure_heights()
+        if 0 <= index < len(self._heights):
+            return self._heights[index]
+        return 0.0
 
     def _block_top(self, index: int) -> float:
-        """第 index 行的顶部 y(从 origin 算起,不含 origin 自身)。"""
-        if self._lyrics is None:
-            return 0.0
-        # 累加之前所有行的高度
-        y = 0.0
-        for i in range(index):
-            y += self._block_height(i)
-        return y
+        self._ensure_heights()
+        if 0 <= index < len(self._offsets):
+            return self._offsets[index]
+        return 0.0
 
     # ------------------------------------------------------------------
     # 绘制
@@ -283,8 +310,8 @@ class _LyricsCanvas(QWidget):
         if self._lyrics is None or len(self._lyrics) == 0:
             self._scroll = 0.0
             return
-        total_h = sum(self._block_height(i) for i in range(len(self._lyrics)))
-        max_scroll = max(0.0, total_h - self.height() + 60)
+        self._ensure_heights()
+        max_scroll = max(0.0, self._total_height - self.height() + 60)
         if self._scroll < 0:
             self._scroll = 0.0
         elif self._scroll > max_scroll:

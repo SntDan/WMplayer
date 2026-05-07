@@ -110,31 +110,33 @@ class Playlist(QObject):
                 continue
         return self.replace_with_tracks(tracks, start_index)
 
+    def restore_with_tracks(
+        self,
+        tracks: List[TrackMetadata],
+        original_tracks: Optional[List[TrackMetadata]] = None,
+    ) -> None:
+        """直接还原原有的播放列表状态(已解析好的 tracks),不触发额外的洗牌逻辑。"""
+        self._tracks = list(tracks)
+        self._original_order = list(original_tracks) if original_tracks else None
+        self._current_index = -1
+        self.changed.emit()
+
     def restore_with_paths(self, paths: List[str], original_paths: Optional[List[str]]) -> None:
-        """直接还原原有的播放列表状态，不触发额外的洗牌逻辑。"""
-        tracks: List[TrackMetadata] = []
+        """按路径直接还原(慢路径,会读元数据)。优先调用方先用 library 缓存解析好再传 tracks。"""
+        tracks = self._resolve_paths(paths)
+        orig = self._resolve_paths(original_paths) if original_paths else None
+        self.restore_with_tracks(tracks, orig)
+
+    @staticmethod
+    def _resolve_paths(paths: List[str]) -> List[TrackMetadata]:
+        out: List[TrackMetadata] = []
         for p in paths:
             if p and os.path.isfile(p) and is_supported(p):
                 try:
-                    tracks.append(read_metadata(p, with_cover=False))
+                    out.append(read_metadata(p, with_cover=False))
                 except Exception:
                     pass
-        self._tracks = tracks
-        
-        if original_paths:
-            orig_tracks: List[TrackMetadata] = []
-            for p in original_paths:
-                if p and os.path.isfile(p) and is_supported(p):
-                    try:
-                        orig_tracks.append(read_metadata(p, with_cover=False))
-                    except Exception:
-                        pass
-            self._original_order = orig_tracks if orig_tracks else None
-        else:
-            self._original_order = None
-            
-        self._current_index = -1
-        self.changed.emit()
+        return out
 
     def append_tracks(self, tracks: List[TrackMetadata]) -> int:
         existing = {t.path for t in self._tracks}

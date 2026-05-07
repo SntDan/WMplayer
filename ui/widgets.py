@@ -17,7 +17,6 @@ from typing import Optional
 
 from PyQt6.QtCore import (
     QPointF,
-    QRect,
     QRectF,
     QSize,
     Qt,
@@ -28,10 +27,8 @@ from PyQt6.QtGui import (
     QBrush,
     QColor,
     QFont,
-    QFontMetrics,
     QImage,
     QPainter,
-    QPainterPath,
     QPen,
     QPixmap,
 )
@@ -482,12 +479,27 @@ class ScrollingLabel(QLabel):
     def setText(self, text: str) -> None:  # noqa: N802
         super().setText(text)
         self._offset = 0
-        # 仅当文本超出宽度才滚动
+        self._maybe_start_timer()
+
+    def _maybe_start_timer(self) -> None:
+        # 仅当 widget 可见且文本超出宽度才启用滚动定时器
+        if not self.isVisible():
+            self._timer.stop()
+            return
         fm = self.fontMetrics()
-        if fm.horizontalAdvance(text) > self.width():
-            self._timer.start(30)
+        if fm.horizontalAdvance(self.text()) > self.width():
+            if not self._timer.isActive():
+                self._timer.start(30)
         else:
             self._timer.stop()
+
+    def showEvent(self, e):  # noqa: N802
+        super().showEvent(e)
+        self._maybe_start_timer()
+
+    def hideEvent(self, e):  # noqa: N802
+        super().hideEvent(e)
+        self._timer.stop()
 
     def _tick(self) -> None:
         self._offset += self._direction
@@ -509,98 +521,6 @@ class ScrollingLabel(QLabel):
         p.setFont(self.font())
         y = (self.height() + fm.ascent() - fm.descent()) // 2
         p.drawText(-self._offset, y, self.text())
-        p.end()
-
-
-# ----------------------------------------------------------------------
-# 歌曲信息块: 在给定的整块矩形内自适应字号绘制 标题/艺术家/专辑 三行
-# ----------------------------------------------------------------------
-class TrackInfoBlock(QWidget):
-    """自绘的"歌曲信息"区域。
-
-    给它一个矩形,它会:
-    - 把 title / artist / album 三行垂直居中
-    - 字号根据可用高度等比缩放(在合理上下限内)
-    - title 粗体,artist 普通白,album 灰
-    - 长行自动换行,不省略
-    """
-
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
-        self._title = "Song"
-        self._artist = "Artist"
-        self._album = "Album"
-        # 整体可弹性的高度,但报告固定 sizeHint 让父布局计算稳定
-        sp = QSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
-        self.setSizePolicy(sp)
-        self.setMinimumHeight(80)
-
-    def sizeHint(self) -> QSize:  # noqa: N802
-        return QSize(0, 110)
-
-    def minimumSizeHint(self) -> QSize:  # noqa: N802
-        return QSize(0, 80)
-
-    def set_track_info(self, title: str, artist: str, album: str) -> None:
-        self._title = title or ""
-        self._artist = artist or ""
-        self._album = album or ""
-        self.update()
-
-    def paintEvent(self, _e) -> None:  # noqa: N802
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
-        w = self.width()
-        h = self.height()
-        if w <= 0 or h <= 0:
-            return
-        # 字号: 基础大小由高度决定,3 行平均分 → 单行约 h/3.5
-        # 限制在合理范围
-        base = max(13, min(28, int(h / 4.2)))
-        title_size = base + 6
-        sub_size = base
-        # 行间距
-        gap = max(4, base // 3)
-
-        title_font = QFont()
-        title_font.setPointSize(title_size)
-        title_font.setBold(True)
-        sub_font = QFont()
-        sub_font.setPointSize(sub_size)
-
-        title_fm = QFontMetrics(title_font)
-        sub_fm = QFontMetrics(sub_font)
-
-        # 文本左右内边距
-        text_w = max(50, w - 24)
-
-        # 计算每行的实际显示高度(支持换行)
-        wrap_flags = int(Qt.TextFlag.TextWordWrap) | int(Qt.AlignmentFlag.AlignHCenter)
-        title_rect = title_fm.boundingRect(QRect(0, 0, text_w, 10000), wrap_flags, self._title or " ")
-        artist_rect = sub_fm.boundingRect(QRect(0, 0, text_w, 10000), wrap_flags, self._artist or " ")
-        album_rect = sub_fm.boundingRect(QRect(0, 0, text_w, 10000), wrap_flags, self._album or " ")
-
-        total_h = title_rect.height() + artist_rect.height() + album_rect.height() + gap * 2
-        # 垂直居中
-        top = (h - total_h) // 2
-        x = (w - text_w) // 2
-
-        # 标题
-        p.setFont(title_font)
-        p.setPen(QColor("#FFFFFF"))
-        rect = QRect(x, top, text_w, title_rect.height())
-        p.drawText(rect, wrap_flags, self._title)
-
-        # 艺术家
-        p.setFont(sub_font)
-        rect = QRect(x, rect.bottom() + gap, text_w, artist_rect.height())
-        p.drawText(rect, wrap_flags, self._artist)
-
-        # 专辑(灰色)
-        p.setPen(QColor("#9E9E9E"))
-        rect = QRect(x, rect.bottom() + gap, text_w, album_rect.height())
-        p.drawText(rect, wrap_flags, self._album)
         p.end()
 
 

@@ -180,13 +180,14 @@ def _extract_cover(audio, path: str) -> Optional[bytes]:
     except Exception:
         pass
 
-    # 兜底:同目录下 cover.* 文件
+    # 兜底:同目录下 cover.* 文件 (限制 ≤20MB,避免读到几十 MB 的图把每次扫描卡死)
     try:
         folder = os.path.dirname(path)
+        max_bytes = 20 * 1024 * 1024
         for name in ("cover", "folder", "front", "albumart", "Cover", "Folder"):
             for ext in (".jpg", ".jpeg", ".png", ".webp"):
                 cand = os.path.join(folder, name + ext)
-                if os.path.isfile(cand):
+                if os.path.isfile(cand) and os.path.getsize(cand) <= max_bytes:
                     with open(cand, "rb") as f:
                         return f.read()
     except Exception:

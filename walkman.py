@@ -1,10 +1,8 @@
 """
 程序入口
 ========
-运行方式都行:
-  python main.py
-  python music_player/main.py
-  python -m music_player
+运行方式:
+  python walkman.py
 """
 
 from __future__ import annotations

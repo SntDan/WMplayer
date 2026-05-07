@@ -337,8 +337,7 @@ class MainWindow(QMainWindow):
         # 音量、模式
         self._engine.set_volume(int(self._config.get("volume", 80)))
         # 优先用新版双字段; 缺失时从旧的 play_mode 转换
-        cfg_data = self._config._data  # 直接看是否存在该键
-        if "shuffled" in cfg_data or "repeat" in cfg_data:
+        if self._config.has("shuffled") or self._config.has("repeat"):
             try:
                 self._playlist.set_repeat(RepeatMode(self._config.get("repeat", "none")))
             except Exception:
@@ -353,12 +352,15 @@ class MainWindow(QMainWindow):
         # 还原"上次播放队列"——保存在 queue.m3u8 和 queue_original.m3u8
         if os.path.isfile(QUEUE_CACHE_PATH):
             paths = m3u.parse_file(QUEUE_CACHE_PATH)
-            original_paths = None
+            original_paths: Optional[List[str]] = None
             if os.path.isfile(QUEUE_ORIGINAL_CACHE_PATH):
                 original_paths = m3u.parse_file(QUEUE_ORIGINAL_CACHE_PATH)
-            
+
             if paths:
-                self._playlist.restore_with_paths(paths, original_paths)
+                # 优先用 library 缓存命中,只对未命中的路径回退到 read_metadata
+                tracks = self._tracks_from_paths(paths)
+                orig_tracks = self._tracks_from_paths(original_paths) if original_paths else None
+                self._playlist.restore_with_tracks(tracks, orig_tracks)
                 # 还原当前曲目
                 last = self._config.get("last_track_path", "")
                 if last:
@@ -381,7 +383,7 @@ class MainWindow(QMainWindow):
             self.player_panel._lock_width_to_height()
 
     def closeEvent(self, e):  # noqa: N802
-        if not getattr(self._config, "_factory_reset", False):
+        if not self._config.factory_reset_pending:
             try:
                 self._config.set("volume", self._engine.get_volume())
                 # 新版双字段(主)
@@ -551,13 +553,12 @@ class MainWindow(QMainWindow):
     # ==================================================================
     # 曲库操作
     # ==================================================================
-    def _play_paths_now(self, paths: List[str], start_index: int = 0) -> None:
-        if not paths:
-            return
-            
+    def _tracks_from_paths(self, paths):
+        """优先命中曲库缓存;未命中再用 read_metadata 兜底,避免大量同步读盘。"""
         tracks = []
         for p in paths:
-            # 优先从曲库缓存命中，避免大量读取磁盘造成卡顿
+            if not p:
+                continue
             t = self._library.find_by_path(p)
             if t:
                 tracks.append(t)
@@ -566,7 +567,12 @@ class MainWindow(QMainWindow):
                     tracks.append(read_metadata(p, with_cover=False))
                 except Exception:
                     pass
+        return tracks
 
+    def _play_paths_now(self, paths: List[str], start_index: int = 0) -> None:
+        if not paths:
+            return
+        tracks = self._tracks_from_paths(paths)
         new_start_index = self._playlist.replace_with_tracks(tracks, start_index)
         if len(self._playlist) > 0:
             self._play_index(new_start_index)
@@ -574,18 +580,7 @@ class MainWindow(QMainWindow):
     def _enqueue_paths(self, paths: List[str]) -> None:
         if not paths:
             return
-            
-        tracks = []
-        for p in paths:
-            t = self._library.find_by_path(p)
-            if t:
-                tracks.append(t)
-            else:
-                try:
-                    tracks.append(read_metadata(p, with_cover=False))
-                except Exception:
-                    pass
-
+        tracks = self._tracks_from_paths(paths)
         n = self._playlist.append_tracks(tracks)
         self.statusBar().showMessage(f"已加入 {n} 首到队列", 3000)
 

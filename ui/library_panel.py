@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
 from core.library import Library
 from core.thumbnails import thumb_path_for
 from ui.list_delegates import CoverRowDelegate, ROLE_SUBTITLE, ROLE_THUMB_PATH
+from ui.theme import BTN_QSS as _BTN_QSS
 
 
 class LibraryPanel(QWidget):
@@ -202,11 +203,3 @@ class LibraryPanel(QWidget):
                 continue
             hay = item.data(self._ROLE_FILTER_HAY) or ""
             item.setHidden(text not in hay)
-
-
-_BTN_QSS = (
-    "QPushButton{background:#1a1a1a; border:1px solid #333; "
-    "padding:4px 10px; border-radius:4px; color:#FFF;}"
-    "QPushButton:hover{background:#2a2a2a; border-color:#E63946;}"
-    "QPushButton:disabled{color:#555;}"
-)

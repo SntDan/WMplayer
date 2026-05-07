@@ -39,13 +39,7 @@ from core.config import (
     default_library_dir, default_playlists_dir,
 )
 from core.thumbnails import THUMB_DIR
-
-
-_BTN_QSS = (
-    "QPushButton{background:#1a1a1a; border:1px solid #333; "
-    "padding:4px 10px; border-radius:4px; color:#FFF;}"
-    "QPushButton:hover{background:#2a2a2a; border-color:#E63946;}"
-)
+from ui.theme import BTN_QSS as _BTN_QSS
 
 
 class SettingsDialog(QDialog):
@@ -249,7 +243,7 @@ class SettingsDialog(QDialog):
         self._config.save()
 
         # 告知 closeEvent 跳过状态保存，避免队列文件被重新写入
-        self._config._factory_reset = True
+        self._config.mark_factory_reset()
         QApplication.instance().quit()
 
     # ------------------------------------------------------------------

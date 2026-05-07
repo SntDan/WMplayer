@@ -10,6 +10,7 @@ from core.library import Library
 from core.metadata import TrackMetadata
 from core.thumbnails import thumb_path_for
 from ui.list_delegates import CoverRowDelegate, ROLE_SUBTITLE, ROLE_THUMB_PATH
+from ui.theme import PRIMARY_BTN_QSS
 
 class ElidedLabel(QLabel):
     def __init__(self, text: str = "", parent: Optional[QWidget] = None) -> None:
@@ -135,7 +136,7 @@ class AlbumsPanel(QWidget):
         if self._embedded:
             h_bottom = QHBoxLayout()
             self.btn_back_group = QPushButton("返回")
-            self.btn_back_group.setStyleSheet("QPushButton{background:#E63946; color:#FFF; border:none; padding:6px 12px; border-radius:4px; font-weight:bold;} QPushButton:hover{background:#d62828;}")
+            self.btn_back_group.setStyleSheet(PRIMARY_BTN_QSS)
             self.btn_back_group.setCursor(Qt.CursorShape.PointingHandCursor)
             h_bottom.addWidget(self.btn_back_group)
             h_bottom.addStretch()
@@ -187,13 +188,13 @@ class AlbumsPanel(QWidget):
         
         h_back = QHBoxLayout()
         self.btn_back = QPushButton("返回")
-        self.btn_back.setStyleSheet("QPushButton{background:#E63946; color:#FFF; border:none; padding:6px 12px; border-radius:4px; font-weight:bold;} QPushButton:hover{background:#d62828;}")
+        self.btn_back.setStyleSheet(PRIMARY_BTN_QSS)
         self.btn_back.setCursor(Qt.CursorShape.PointingHandCursor)
         h_back.addWidget(self.btn_back)
         h_back.addStretch()
         
         self.btn_play_all = QPushButton("播放全部")
-        self.btn_play_all.setStyleSheet("QPushButton{background:#E63946; color:#FFF; border:none; padding:6px 12px; border-radius:4px; font-weight:bold;} QPushButton:hover{background:#d62828;}")
+        self.btn_play_all.setStyleSheet(PRIMARY_BTN_QSS)
         self.btn_play_all.setCursor(Qt.CursorShape.PointingHandCursor)
         h_back.addWidget(self.btn_play_all)
         l1.addLayout(h_back)
@@ -206,7 +207,7 @@ class AlbumsPanel(QWidget):
         # 单信号: 单击直接进详情(避免双击同时触发 click+doubleClick 重复加载封面)
         self.list_albums.itemClicked.connect(self._on_album_clicked)
         if self._embedded:
-            self.btn_back_group.clicked.connect(self.back_to_artists_requested.emit)
+            self.btn_back_group.clicked.connect(self._on_back_to_artists)
         self.btn_back.clicked.connect(lambda: self.stack.setCurrentIndex(0))
         self.list_tracks.itemDoubleClicked.connect(self._on_track_clicked)
         self.btn_play_all.clicked.connect(self._on_play_all)
@@ -224,7 +225,7 @@ class AlbumsPanel(QWidget):
             self._albums_tracks[album].append(t)
         
         for tracks in self._albums_tracks.values():
-            tracks.sort(key=lambda t: (t.track_number if t.track_number > 0 else 9999, t.title))
+            tracks.sort(key=lambda t: (t.track_number if t.track_number > 0 else 9999, t.title or ""))
 
         self.list_albums.clear()
         albums = sorted(self._albums_tracks.keys())
@@ -314,6 +315,11 @@ class AlbumsPanel(QWidget):
     def _on_album_clicked(self, item: QListWidgetItem) -> None:
         album = item.data(Qt.ItemDataRole.UserRole)
         self.show_album(album)
+
+    def _on_back_to_artists(self) -> None:
+        # 切回艺术家列表前清掉过滤,避免下次再打开时残留前一位艺术家的视图
+        self._filter_artist = None
+        self.back_to_artists_requested.emit()
         
     def _on_track_clicked(self, item: QListWidgetItem) -> None:
         path = item.data(Qt.ItemDataRole.UserRole)

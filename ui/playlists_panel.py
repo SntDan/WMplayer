@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
 )
 
 from core.playlist_store import PlaylistStore
+from ui.theme import BTN_QSS as _BTN_QSS
 
 
 class PlaylistsPanel(QWidget):
@@ -131,10 +132,3 @@ class PlaylistsPanel(QWidget):
             )
             if ans == QMessageBox.StandardButton.Yes:
                 self.delete_playlist.emit(name)
-
-
-_BTN_QSS = (
-    "QPushButton{background:#1a1a1a; border:1px solid #333; "
-    "padding:4px 10px; border-radius:4px; color:#FFF;}"
-    "QPushButton:hover{background:#2a2a2a; border-color:#E63946;}"
-)
