@@ -26,6 +26,7 @@ QPixmapCache.setCacheLimit(60 * 1024)  # 60 MB
 # 自定义角色,与 DisplayRole/UserRole 错开
 ROLE_THUMB_PATH = Qt.ItemDataRole.UserRole + 1
 ROLE_SUBTITLE = Qt.ItemDataRole.UserRole + 2
+ROLE_IS_PLAYING = Qt.ItemDataRole.UserRole + 3
 
 
 class CoverRowDelegate(QStyledItemDelegate):
@@ -75,14 +76,17 @@ class CoverRowDelegate(QStyledItemDelegate):
 
         title = index.data(Qt.ItemDataRole.DisplayRole) or ""
         subtitle = index.data(ROLE_SUBTITLE) or ""
+        is_playing = bool(index.data(ROLE_IS_PLAYING))
 
         base_pt = self._base_pt(option.font)
 
         # 标题
         title_font = QFont(option.font)
         self._set_font_size(title_font, base_pt + 1)
+        if is_playing:
+            title_font.setBold(True)
         painter.setFont(title_font)
-        painter.setPen(QColor("#FFFFFF"))
+        painter.setPen(QColor("#E63946") if is_playing else QColor("#FFFFFF"))
         title_fm = QFontMetrics(title_font)
         title_h = title_fm.height()
 

@@ -26,9 +26,14 @@ from PyQt6.QtWidgets import (
 
 from ui.theme import BTN_QSS as _BTN_QSS
 
-from core.metadata import TrackMetadata
 from core.playlist import Playlist
-from .theme import Theme
+from core.thumbnails import thumb_path_for
+from ui.list_delegates import (
+    CoverRowDelegate,
+    ROLE_IS_PLAYING,
+    ROLE_SUBTITLE,
+    ROLE_THUMB_PATH,
+)
 
 
 class QueuePanel(QWidget):
@@ -82,7 +87,10 @@ class QueuePanel(QWidget):
         self.list = QListWidget()
         self.list.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
         self.list.setUniformItemSizes(True)
+        self.list.setMouseTracking(True)
         self.list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._row_delegate = CoverRowDelegate(self.list)
+        self.list.setItemDelegate(self._row_delegate)
         outer.addWidget(self.list, 1)
 
     def _wire(self) -> None:
@@ -103,30 +111,22 @@ class QueuePanel(QWidget):
     def refresh(self) -> None:
         self.list.clear()
         for i, t in enumerate(self._playlist.tracks):
-            it = QListWidgetItem(self._format(i, t))
+            it = QListWidgetItem(t.title or "")
             it.setData(Qt.ItemDataRole.UserRole, i)
+            it.setData(ROLE_THUMB_PATH, thumb_path_for(t.path))
+            it.setData(ROLE_SUBTITLE, t.artist or "")
             self.list.addItem(it)
         self.count_label.setText(f"{len(self._playlist)} 首")
         self._highlight_current()
         self._apply_filter(self.search.text())
         self._scroll_to_current()
 
-    @staticmethod
-    def _format(i: int, t: TrackMetadata) -> str:
-        return f"{i + 1:>3}.  {t.title}  —  {t.artist}"
-
     def _highlight_current(self) -> None:
         current = self._playlist.current_index
         for i in range(self.list.count()):
             item = self.list.item(i)
             idx = item.data(Qt.ItemDataRole.UserRole)
-            f = item.font()
-            if idx == current:
-                f.setBold(True); item.setFont(f)
-                item.setForeground(Theme.LIST_PLAYING)
-            else:
-                f.setBold(False); item.setFont(f)
-                item.setForeground(Theme.TEXT)
+            item.setData(ROLE_IS_PLAYING, idx == current)
 
     def _on_current_changed(self, _index: int) -> None:
         self._highlight_current()

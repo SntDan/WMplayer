@@ -166,9 +166,8 @@ class MainWindow(QMainWindow):
         self._playlist = Playlist(self)              # 当前播放队列
         self._library = Library(LIBRARY_CACHE_PATH, self)
         self._library.set_folders(self._config.library_folders_effective())
-        self._store = PlaylistStore(
-            self._config.get("playlists_dir", default_playlists_dir()), self
-        )
+        self._store = PlaylistStore(default_playlists_dir(), self)
+        self._store.set_locations(self._config.playlist_locations_effective())
 
         self._pool = QThreadPool.globalInstance()
         self._cover_signals = _CoverSignals(self)
@@ -643,10 +642,20 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(f"已创建歌单 “{name}”", 3000)
 
     def _on_rename_playlist(self, old: str, new: str) -> None:
+        if not self._store.is_writable(old):
+            QMessageBox.information(
+                self, "无法重命名", "该歌单来自附加源,只读。请把它复制到默认目录后再重命名。"
+            )
+            return
         if not self._store.rename(old, new):
             QMessageBox.warning(self, "重命名失败", "新名称可能已存在,或文件无法重命名。")
 
     def _on_delete_playlist(self, name: str) -> None:
+        if not self._store.is_writable(name):
+            QMessageBox.information(
+                self, "无法删除", "该歌单来自附加源,只读。请到对应位置手动删除。"
+            )
+            return
         self._store.delete(name)
 
     # ==================================================================
@@ -659,8 +668,6 @@ class MainWindow(QMainWindow):
             # 把变更应用到运行中的对象
             self._engine.set_volume(int(self._config.get("volume", 80)))
             self._library.set_folders(self._config.library_folders_effective())
-            self._store.set_directory(
-                self._config.get("playlists_dir", default_playlists_dir())
-            )
+            self._store.set_locations(self._config.playlist_locations_effective())
             # 应用后自动重扫
             self._library.scan_async()

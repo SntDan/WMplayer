@@ -91,12 +91,16 @@ class PlaylistsPanel(QWidget):
         self.list.customContextMenuRequested.connect(self._on_context_menu)
 
     def refresh(self) -> None:
-        self.path_label.setText(f"目录:{self._store.directory}")
+        self.path_label.setText(f"默认目录: {self._store.default_dir}")
         self.list.clear()
         names = self._store.list_names()
         for name in names:
             it = QListWidgetItem(name)
             it.setData(Qt.ItemDataRole.UserRole, name)
+            # 只读源(附加文件夹/文件)的歌单名旁边加个标记,方便用户识别
+            if not self._store.is_writable(name):
+                it.setText(f"{name}  (只读)")
+                it.setForeground(Qt.GlobalColor.gray)
             self.list.addItem(it)
         self.count_label.setText(f"{len(names)} 个")
 

@@ -62,10 +62,12 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "window_geometry": None,
     "auto_resume": True,
 
+    # 用户在设置里加的曲库目录(默认 library/ 始终额外扫描,不在此列表)
     "library_folders": [],
-    "include_default_library": True,
 
-    "playlists_dir": default_playlists_dir(),
+    # 用户在设置里加的附加歌单源(文件夹或单独 .m3u8 文件)。
+    # 默认歌单目录始终额外包含,不在此列表。
+    "playlist_locations": [],
 
     "last_playlist_name": "",
 }
@@ -120,13 +122,30 @@ class Config:
         return self._factory_reset_pending
 
     def library_folders_effective(self) -> List[str]:
-        """实际生效的曲库根目录(用户自定义 + 默认 library/)。"""
+        """实际生效的曲库根目录(默认 library/ 始终包含,后接用户自定义)。"""
         result: List[str] = []
+        d = default_library_dir()
+        if os.path.isdir(d):
+            result.append(os.path.abspath(d))
         for f in self.get("library_folders", []) or []:
-            if f and os.path.isdir(f):
-                result.append(os.path.abspath(f))
-        if self.get("include_default_library", True):
-            d = default_library_dir()
-            if os.path.isdir(d) and d not in result:
-                result.append(d)
+            if not f:
+                continue
+            ap = os.path.abspath(f)
+            if os.path.isdir(ap) and ap not in result:
+                result.append(ap)
+        return result
+
+    def playlist_locations_effective(self) -> List[str]:
+        """用户自定义的附加歌单源(默认目录由 PlaylistStore 单独传入,不在此列表)。"""
+        result: List[str] = []
+        default_abs = os.path.abspath(default_playlists_dir())
+        for loc in self.get("playlist_locations", []) or []:
+            if not loc:
+                continue
+            ap = os.path.abspath(loc)
+            if ap == default_abs:
+                continue  # 默认目录单独处理,避免重复
+            if os.path.isdir(ap) or os.path.isfile(ap):
+                if ap not in result:
+                    result.append(ap)
         return result

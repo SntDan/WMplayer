@@ -323,17 +323,36 @@ class AlbumsPanel(QWidget):
         
     def _on_track_clicked(self, item: QListWidgetItem) -> None:
         path = item.data(Qt.ItemDataRole.UserRole)
-        tracks = self._albums_tracks.get(getattr(self, "_current_album", ""), [])
-        paths = [t.path for t in tracks]
+        album = getattr(self, "_current_album", "")
+        tracks = self._albums_tracks.get(album, [])
         try:
-            idx = paths.index(path)
-        except ValueError:
-            idx = 0
-        self.play_paths_now.emit(paths, idx)
+            track_idx = next(i for i, t in enumerate(tracks) if t.path == path)
+        except StopIteration:
+            track_idx = 0
+        self._play_from_album(album, track_idx)
 
     def _on_play_all(self) -> None:
         album = getattr(self, "_current_album", "")
-        tracks = self._albums_tracks.get(album, [])
-        if tracks:
-            paths = [t.path for t in tracks]
-            self.play_paths_now.emit(paths, 0)
+        if album in self._albums_tracks:
+            self._play_from_album(album, 0)
+
+    def _play_from_album(self, album: str, track_index: int) -> None:
+        """从指定专辑的某曲播起,后续按当前列表顺序自动续播下一张专辑直到结尾。
+
+        - 通用专辑视图:续播全曲库内按字母序的下一张专辑
+        - 艺术家筛选视图:仅续播该歌手的下一张专辑(因为 _albums_tracks 已被
+          set_artist_filter 过滤过)
+        """
+        albums = sorted(self._albums_tracks.keys())
+        if album not in albums:
+            return
+        start_album_pos = albums.index(album)
+        paths: List[str] = []
+        play_idx = 0
+        for i in range(start_album_pos, len(albums)):
+            album_tracks = self._albums_tracks[albums[i]]
+            if i == start_album_pos:
+                play_idx = len(paths) + max(0, min(track_index, len(album_tracks) - 1))
+            paths.extend(t.path for t in album_tracks)
+        if paths:
+            self.play_paths_now.emit(paths, play_idx)

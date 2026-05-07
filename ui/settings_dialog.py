@@ -1,10 +1,9 @@
 """
 设置对话框
 ==========
-- 曲库文件夹列表(增/删)
-- 是否包含程序内置 library/ 子目录
-- 歌单存储目录
-- 音量、自动恢复
+- 曲库:默认目录(只读、置顶) + 用户自定义文件夹
+- 歌单:默认目录(只读、置顶) + 用户自定义文件夹/单独 .m3u8 文件
+- 通用: 音量、自动恢复、恢复出厂
 """
 
 from __future__ import annotations
@@ -23,8 +22,8 @@ from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPushButton,
     QSlider,
@@ -42,12 +41,27 @@ from core.thumbnails import THUMB_DIR
 from ui.theme import BTN_QSS as _BTN_QSS
 
 
+_LOCKED_DEFAULT_QSS = (
+    "QLabel{background:#0a0a0a; border:1px solid #222; border-radius:3px;"
+    "padding:6px 10px; color:#777;}"
+)
+
+
+def _make_default_label(prefix: str, path: str) -> QLabel:
+    """构造一个灰色、不可改的"默认目录"提示行。"""
+    lbl = QLabel(f"{prefix} {path}")
+    lbl.setStyleSheet(_LOCKED_DEFAULT_QSS)
+    lbl.setToolTip("默认目录,始终启用,不可更改")
+    lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+    return lbl
+
+
 class SettingsDialog(QDialog):
     def __init__(self, config: Config, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._config = config
         self.setWindowTitle("设置")
-        self.setMinimumSize(560, 460)
+        self.setMinimumSize(620, 500)
 
         layout = QVBoxLayout(self)
 
@@ -80,10 +94,12 @@ class SettingsDialog(QDialog):
     def _build_library_tab(self) -> QWidget:
         w = QWidget()
         v = QVBoxLayout(w)
-        v.setSpacing(10)
+        v.setSpacing(8)
 
-        v.addWidget(QLabel("曲库根目录(扫描以下文件夹下的所有音频):"))
+        # 默认目录(置顶、灰色、不可改)
+        v.addWidget(_make_default_label("默认目录:", default_library_dir()))
 
+        v.addWidget(QLabel("额外的曲库根目录:"))
         self.lst_folders = QListWidget()
         self.lst_folders.setStyleSheet(
             "QListWidget{border:1px solid #333; background:#0a0a0a;}"
@@ -101,31 +117,20 @@ class SettingsDialog(QDialog):
             row.addWidget(b)
         row.addStretch(1)
         v.addLayout(row)
-        b_add.clicked.connect(self._add_folder)
-        b_remove.clicked.connect(self._remove_folder)
-
-        self.chk_default_lib = QCheckBox(
-            f"同时扫描程序自带目录 ({default_library_dir()})"
-        )
-        self.chk_default_lib.setChecked(
-            bool(self._config.get("include_default_library", True))
-        )
-        v.addWidget(self.chk_default_lib)
-
+        b_add.clicked.connect(self._add_library_folder)
+        b_remove.clicked.connect(lambda: self._remove_selected(self.lst_folders))
         return w
 
-    def _add_folder(self) -> None:
+    def _add_library_folder(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "选择曲库根目录")
-        if folder:
-            # 去重
-            for i in range(self.lst_folders.count()):
-                if self.lst_folders.item(i).text() == folder:
-                    return
-            self.lst_folders.addItem(folder)
-
-    def _remove_folder(self) -> None:
-        for it in self.lst_folders.selectedItems():
-            self.lst_folders.takeItem(self.lst_folders.row(it))
+        if not folder:
+            return
+        if self._list_contains(self.lst_folders, folder):
+            return
+        # 默认目录已经隐式包含了
+        if os.path.abspath(folder) == os.path.abspath(default_library_dir()):
+            return
+        self.lst_folders.addItem(folder)
 
     # ------------------------------------------------------------------
     # 歌单 tab
@@ -133,38 +138,67 @@ class SettingsDialog(QDialog):
     def _build_playlists_tab(self) -> QWidget:
         w = QWidget()
         v = QVBoxLayout(w)
-        v.setSpacing(10)
+        v.setSpacing(8)
 
-        v.addWidget(QLabel("歌单(.m3u8)存储目录:"))
-        row = QHBoxLayout()
-        self.edt_playlists = QLineEdit(
-            self._config.get("playlists_dir", default_playlists_dir())
+        v.addWidget(_make_default_label("默认目录:", default_playlists_dir()))
+
+        v.addWidget(QLabel("额外的歌单源(文件夹或单独的 .m3u8 文件):"))
+        self.lst_playlist_locs = QListWidget()
+        self.lst_playlist_locs.setStyleSheet(
+            "QListWidget{border:1px solid #333; background:#0a0a0a;}"
         )
-        b_browse = QPushButton("浏览…")
-        b_browse.setCursor(Qt.CursorShape.PointingHandCursor)
-        b_browse.setStyleSheet(_BTN_QSS)
-        b_browse.clicked.connect(self._browse_playlists_dir)
-        row.addWidget(self.edt_playlists, 1)
-        row.addWidget(b_browse)
+        for loc in self._config.get("playlist_locations", []) or []:
+            self._add_playlist_location_item(loc)
+        v.addWidget(self.lst_playlist_locs, 1)
+
+        row = QHBoxLayout()
+        b_add_dir = QPushButton("+ 添加文件夹")
+        b_add_file = QPushButton("+ 添加歌单文件")
+        b_remove = QPushButton("移除选中")
+        for b in (b_add_dir, b_add_file, b_remove):
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setStyleSheet(_BTN_QSS)
+            row.addWidget(b)
+        row.addStretch(1)
         v.addLayout(row)
+        b_add_dir.clicked.connect(self._add_playlist_folder)
+        b_add_file.clicked.connect(self._add_playlist_file)
+        b_remove.clicked.connect(lambda: self._remove_selected(self.lst_playlist_locs))
 
         hint = QLabel(
             "<div style='color:#888;font-size:11px;'>"
-            "默认为程序根目录下的 <code>playlists/</code> 子文件夹。<br>"
-            "歌单格式: 标准 M3U8 (UTF-8),首行 #EXTM3U,可直接和其他播放器互通。"
+            "新建/重命名/删除的歌单都保存到默认目录。<br>"
+            "附加源里的歌单只能播放,不能修改。"
             "</div>"
         )
         hint.setWordWrap(True)
         v.addWidget(hint)
-        v.addStretch(1)
         return w
 
-    def _browse_playlists_dir(self) -> None:
-        folder = QFileDialog.getExistingDirectory(
-            self, "选择歌单存储目录", self.edt_playlists.text()
-        )
+    def _add_playlist_location_item(self, loc: str) -> None:
+        if not loc:
+            return
+        ap = os.path.abspath(loc)
+        if ap == os.path.abspath(default_playlists_dir()):
+            return  # 默认目录隐式包含
+        if self._list_contains(self.lst_playlist_locs, ap, by_data=True):
+            return
+        kind = "文件夹" if os.path.isdir(ap) else "文件"
+        it = QListWidgetItem(f"[{kind}] {ap}")
+        it.setData(Qt.ItemDataRole.UserRole, ap)
+        self.lst_playlist_locs.addItem(it)
+
+    def _add_playlist_folder(self) -> None:
+        folder = QFileDialog.getExistingDirectory(self, "选择歌单文件夹")
         if folder:
-            self.edt_playlists.setText(folder)
+            self._add_playlist_location_item(folder)
+
+    def _add_playlist_file(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "选择歌单文件", "", "M3U Playlist (*.m3u8 *.m3u)"
+        )
+        if path:
+            self._add_playlist_location_item(path)
 
     # ------------------------------------------------------------------
     # 通用 tab
@@ -247,16 +281,38 @@ class SettingsDialog(QDialog):
         QApplication.instance().quit()
 
     # ------------------------------------------------------------------
+    # 通用列表辅助
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _list_contains(lst: QListWidget, value: str, by_data: bool = False) -> bool:
+        target = os.path.abspath(value)
+        for i in range(lst.count()):
+            it = lst.item(i)
+            existing = it.data(Qt.ItemDataRole.UserRole) if by_data else it.text()
+            if existing and os.path.abspath(existing) == target:
+                return True
+        return False
+
+    @staticmethod
+    def _remove_selected(lst: QListWidget) -> None:
+        for it in lst.selectedItems():
+            lst.takeItem(lst.row(it))
+
+    # ------------------------------------------------------------------
     # 收尾
     # ------------------------------------------------------------------
     def collected_library_folders(self) -> List[str]:
         return [self.lst_folders.item(i).text() for i in range(self.lst_folders.count())]
 
+    def collected_playlist_locations(self) -> List[str]:
+        return [
+            self.lst_playlist_locs.item(i).data(Qt.ItemDataRole.UserRole)
+            for i in range(self.lst_playlist_locs.count())
+        ]
+
     def apply_to_config(self) -> None:
         self._config.set("library_folders", self.collected_library_folders())
-        self._config.set("include_default_library", self.chk_default_lib.isChecked())
-        self._config.set("playlists_dir",
-                         self.edt_playlists.text().strip() or default_playlists_dir())
+        self._config.set("playlist_locations", self.collected_playlist_locations())
         self._config.set("volume", self.slider_vol.value())
         self._config.set("auto_resume", self.chk_resume.isChecked())
         self._config.save()
