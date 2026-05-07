@@ -97,10 +97,6 @@ class PlaylistsPanel(QWidget):
         for name in names:
             it = QListWidgetItem(name)
             it.setData(Qt.ItemDataRole.UserRole, name)
-            # 只读源(附加文件夹/文件)的歌单名旁边加个标记,方便用户识别
-            if not self._store.is_writable(name):
-                it.setText(f"{name}  (只读)")
-                it.setForeground(Qt.GlobalColor.gray)
             self.list.addItem(it)
         self.count_label.setText(f"{len(names)} 个")
 
