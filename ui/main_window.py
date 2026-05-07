@@ -27,7 +27,6 @@ from PyQt6.QtCore import (
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QButtonGroup,
-    QFileDialog,
     QFrame,
     QHBoxLayout,
     QInputDialog,
@@ -172,7 +171,7 @@ class MainWindow(QMainWindow):
         )
 
         self._pool = QThreadPool.globalInstance()
-        self._cover_signals = _CoverSignals()
+        self._cover_signals = _CoverSignals(self)
         self._cover_signals.done.connect(self._on_cover_loaded)
 
         self._autoplay_after_load = True
@@ -519,10 +518,15 @@ class MainWindow(QMainWindow):
         was_current = (index == self._playlist.current_index)
         self._playlist.remove(index)
         if was_current:
-            self._engine.stop()
-            self.player_panel.set_track(None, -1, len(self._playlist))
-            self.lyrics_panel.set_lyrics(None)
-            self.player_panel.set_lyrics_available(False)
+            # 队列还有曲目就自动播下一首(原 index 位置变成下一首),否则停止
+            if len(self._playlist) > 0:
+                next_idx = min(index, len(self._playlist) - 1)
+                self._play_index(next_idx)
+            else:
+                self._engine.stop()
+                self.player_panel.set_track(None, -1, 0)
+                self.lyrics_panel.set_lyrics(None)
+                self.player_panel.set_lyrics_available(False)
 
     def _on_clear_queue(self) -> None:
         if len(self._playlist) == 0:
@@ -559,7 +563,6 @@ class MainWindow(QMainWindow):
                 tracks.append(t)
             else:
                 try:
-                    from core.metadata import read_metadata
                     tracks.append(read_metadata(p, with_cover=False))
                 except Exception:
                     pass
@@ -579,11 +582,10 @@ class MainWindow(QMainWindow):
                 tracks.append(t)
             else:
                 try:
-                    from core.metadata import read_metadata
                     tracks.append(read_metadata(p, with_cover=False))
                 except Exception:
                     pass
-                    
+
         n = self._playlist.append_tracks(tracks)
         self.statusBar().showMessage(f"已加入 {n} 首到队列", 3000)
 

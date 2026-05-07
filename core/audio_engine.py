@@ -28,11 +28,9 @@ class AudioEngine(QObject):
 
     # 高质量 VLC 参数(尽可能保持原始采样率/位深直通,不下采样)
     _VLC_ARGS = [
-        "--no-video",                # 不输出视频
+        "--no-video",                # 不输出视频(已涵盖 video-title 等子选项)
         "--quiet",                   # 静默日志
-        "--no-video-title-show",
         "--audio-resampler=soxr",    # 高质量重采样(若可用,失败时回退默认)
-        "--no-sout-video",
         "--file-caching=1500",       # 文件缓冲 (ms),避免本地播放卡顿
         "--network-caching=3000",    # 网络流缓冲
     ]

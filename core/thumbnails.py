@@ -19,7 +19,7 @@ from PyQt6.QtGui import QImage
 from core.config import CONFIG_DIR
 
 
-THUMB_SIZE = 64
+THUMB_SIZE = 128
 THUMB_DIR = os.path.join(CONFIG_DIR, "thumbnails")
 
 

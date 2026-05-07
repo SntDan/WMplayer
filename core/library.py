@@ -125,6 +125,7 @@ class Library(QObject):
         self._cache_path = cache_path
         self._folders: List[str] = []
         self._tracks: List[TrackMetadata] = []
+        self._path_map: Optional[Dict[str, TrackMetadata]] = None
         self._scanning = False
         # 扫描信号(单实例,长期存在,与 worker 安全跨线程通信)
         self._signals = _ScanSignals(self)
@@ -148,8 +149,7 @@ class Library(QObject):
         return len(self._tracks)
 
     def find_by_path(self, path: str) -> Optional[TrackMetadata]:
-        # 优化: 改用字典缓存查找
-        if not hasattr(self, "_path_map") or len(getattr(self, "_path_map", {})) != len(self._tracks):
+        if self._path_map is None:
             self._path_map = {t.path: t for t in self._tracks}
         return self._path_map.get(path)
 
@@ -215,6 +215,7 @@ class Library(QObject):
 
     def _on_scan_finished(self, tracks) -> None:
         self._tracks = list(tracks)
+        self._path_map = None  # 失效旧的 path 索引
         self._scanning = False
         self._save_cache()
         self.tracks_changed.emit()
@@ -286,8 +287,11 @@ class Library(QObject):
                     for t in self._tracks
                 ],
             }
-            with open(self._cache_path, "w", encoding="utf-8") as f:
+            # 原子写: 先写 .tmp 再 os.replace,避免崩溃留下半截 JSON
+            tmp = self._cache_path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False)
+            os.replace(tmp, self._cache_path)
         except Exception:
             pass
 

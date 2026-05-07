@@ -109,6 +109,10 @@ class LibraryPanel(QWidget):
     # ------------------------------------------------------------------
     # 数据
     # ------------------------------------------------------------------
+    # 自定义角色: 把过滤所需的小写干草堆缓存在 item 上,
+    # 避免每次按键都对每行做一次 find_by_path 查找。
+    _ROLE_FILTER_HAY = Qt.ItemDataRole.UserRole + 10
+
     def refresh(self) -> None:
         self.list.clear()
         tracks = self._library.tracks
@@ -117,6 +121,8 @@ class LibraryPanel(QWidget):
             it.setData(Qt.ItemDataRole.UserRole, t.path)
             it.setData(ROLE_THUMB_PATH, thumb_path_for(t.path))
             it.setData(ROLE_SUBTITLE, t.artist or "")
+            hay = f"{t.title or ''} {t.artist or ''} {t.album or ''}".lower()
+            it.setData(self._ROLE_FILTER_HAY, hay)
             self.list.addItem(it)
         self.count_label.setText(f"{len(tracks)} 首")
         self._apply_filter(self.search.text())
@@ -194,11 +200,7 @@ class LibraryPanel(QWidget):
             if not text:
                 item.setHidden(False)
                 continue
-            path = item.data(Qt.ItemDataRole.UserRole)
-            t = self._library.find_by_path(path) if path else None
-            if t is None:
-                continue
-            hay = f"{t.title} {t.artist} {t.album}".lower()
+            hay = item.data(self._ROLE_FILTER_HAY) or ""
             item.setHidden(text not in hay)
 
 

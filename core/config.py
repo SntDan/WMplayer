@@ -86,8 +86,10 @@ class Config:
 
     def save(self) -> None:
         try:
-            with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            tmp = CONFIG_PATH + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(self._data, f, ensure_ascii=False, indent=2)
+            os.replace(tmp, CONFIG_PATH)
         except Exception:
             pass
 

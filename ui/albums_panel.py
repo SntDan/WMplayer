@@ -1,6 +1,7 @@
+import os
 from typing import List, Optional, Dict
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont, QPainter
+from PyQt6.QtGui import QFont, QPainter, QPixmap
 from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QPushButton, QVBoxLayout, QWidget, QStackedWidget, QSizePolicy
@@ -202,7 +203,7 @@ class AlbumsPanel(QWidget):
     def _wire(self) -> None:
         self._library.tracks_changed.connect(self.refresh)
         self.search_box.textChanged.connect(self._apply_filter)
-        self.list_albums.itemDoubleClicked.connect(self._on_album_clicked)
+        # 单信号: 单击直接进详情(避免双击同时触发 click+doubleClick 重复加载封面)
         self.list_albums.itemClicked.connect(self._on_album_clicked)
         if self._embedded:
             self.btn_back_group.clicked.connect(self.back_to_artists_requested.emit)
@@ -237,26 +238,20 @@ class AlbumsPanel(QWidget):
             self.list_albums.addItem(it)
             
         if self._embedded and self._filter_artist:
-            # Set artist cover from their first actual track's metadata
+            # 用预生成的缩略图代替同步读完整封面,避免 refresh() 阻塞 UI
             artist_cover_set = False
-            for album, tracks in self._albums_tracks.items():
-                if tracks:
-                    from core.metadata import read_metadata
-                    try:
-                        md = read_metadata(tracks[0].path, with_cover=True)
-                        if md and md.cover:
-                            from PyQt6.QtGui import QPixmap
-                            pix = QPixmap()
-                            pix.loadFromData(md.cover)
-                            self.lbl_artist_cover.setPixmap(
-                                pix.scaled(80, 80, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
-                            )
-                            artist_cover_set = True
-                            break
-                    except Exception:
-                        pass
-                if artist_cover_set:
-                    break
+            for tracks in self._albums_tracks.values():
+                if not tracks:
+                    continue
+                tp = thumb_path_for(tracks[0].path)
+                if os.path.isfile(tp) and os.path.getsize(tp) > 0:
+                    pix = QPixmap(tp)
+                    if not pix.isNull():
+                        self.lbl_artist_cover.setPixmap(
+                            pix.scaled(80, 80, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
+                        )
+                        artist_cover_set = True
+                        break
             if not artist_cover_set:
                 self.lbl_artist_cover.clear()
                 self.lbl_artist_cover.setText("No\nCover")
@@ -291,17 +286,16 @@ class AlbumsPanel(QWidget):
         
         cover_pixmap = None
         if tracks:
-            from core.metadata import read_metadata
-            try:
-                md = read_metadata(tracks[0].path, with_cover=True)
-                if md and md.cover:
-                    from PyQt6.QtGui import QPixmap
-                    pix = QPixmap()
-                    if pix.loadFromData(md.cover):
-                        cover_pixmap = pix.scaled(80, 80, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
-            except Exception:
-                pass
-                
+            tp = thumb_path_for(tracks[0].path)
+            if os.path.isfile(tp) and os.path.getsize(tp) > 0:
+                pix = QPixmap(tp)
+                if not pix.isNull():
+                    cover_pixmap = pix.scaled(
+                        80, 80,
+                        Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+
         if cover_pixmap:
             self.lbl_album_cover.setPixmap(cover_pixmap)
         else:
