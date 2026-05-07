@@ -14,15 +14,18 @@ from typing import List, Optional
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QListWidget,
+    QMessageBox,
     QPushButton,
     QSlider,
     QTabWidget,
@@ -30,7 +33,11 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from core.config import Config, default_library_dir, default_playlists_dir
+from core.config import (
+    Config, DEFAULT_CONFIG,
+    LIBRARY_CACHE_PATH, QUEUE_CACHE_PATH, QUEUE_ORIGINAL_CACHE_PATH,
+    default_library_dir, default_playlists_dir,
+)
 
 
 _BTN_QSS = (
@@ -169,14 +176,18 @@ class SettingsDialog(QDialog):
     # ------------------------------------------------------------------
     def _build_general_tab(self) -> QWidget:
         w = QWidget()
-        form = QFormLayout(w)
+        v = QVBoxLayout(w)
+        v.setSpacing(10)
+
+        form = QFormLayout()
+        form.setContentsMargins(0, 0, 0, 0)
 
         self.slider_vol = QSlider(Qt.Orientation.Horizontal)
         self.slider_vol.setRange(0, 100)
         self.slider_vol.setValue(int(self._config.get("volume", 80)))
         self.lbl_vol = QLabel(f"{self.slider_vol.value()}%")
         self.slider_vol.valueChanged.connect(
-            lambda v: self.lbl_vol.setText(f"{v}%")
+            lambda val: self.lbl_vol.setText(f"{val}%")
         )
         wrap = QWidget()
         h = QHBoxLayout(wrap); h.setContentsMargins(0, 0, 0, 0)
@@ -186,7 +197,51 @@ class SettingsDialog(QDialog):
         self.chk_resume = QCheckBox("启动时恢复上次播放进度")
         self.chk_resume.setChecked(bool(self._config.get("auto_resume", True)))
         form.addRow("", self.chk_resume)
+
+        v.addLayout(form)
+        v.addStretch(1)
+
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setStyleSheet("color: #333;")
+        v.addWidget(line)
+
+        btn_reset = QPushButton("恢复出厂设置…")
+        btn_reset.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_reset.setStyleSheet(
+            "QPushButton{background:#1a0505; border:1px solid #5a1a1a;"
+            "padding:5px 12px; border-radius:4px; color:#FF6B6B;}"
+            "QPushButton:hover{background:#2a0808; border-color:#E63946; color:#FFF;}"
+        )
+        btn_reset.clicked.connect(self._on_factory_reset)
+        v.addWidget(btn_reset)
+
         return w
+
+    def _on_factory_reset(self) -> None:
+        reply = QMessageBox.question(
+            self, "恢复出厂设置",
+            "将清除所有缓存(曲库索引、播放队列)并恢复默认设置，然后自动关闭程序。\n此操作不可撤销，是否继续？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        for path in (LIBRARY_CACHE_PATH, QUEUE_CACHE_PATH, QUEUE_ORIGINAL_CACHE_PATH):
+            try:
+                if os.path.isfile(path):
+                    os.remove(path)
+            except Exception:
+                pass
+
+        for key, value in DEFAULT_CONFIG.items():
+            self._config.set(key, value)
+        self._config.save()
+
+        # 告知 closeEvent 跳过状态保存，避免队列文件被重新写入
+        self._config._factory_reset = True
+        QApplication.instance().quit()
 
     # ------------------------------------------------------------------
     # 收尾

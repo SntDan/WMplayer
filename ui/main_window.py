@@ -382,27 +382,28 @@ class MainWindow(QMainWindow):
             self.player_panel._lock_width_to_height()
 
     def closeEvent(self, e):  # noqa: N802
-        try:
-            self._config.set("volume", self._engine.get_volume())
-            # 新版双字段(主)
-            self._config.set("shuffled", self._playlist.shuffled)
-            self._config.set("repeat", self._playlist.repeat.value)
-            # 旧字段保留,这样降级也能凑合识别(可能损失 shuffled+repeat 同开的信息)
-            self._config.set("play_mode", self._playlist.mode.value)
-            self._config.set("last_position_ms", self._engine.get_position())
-            cur = self._playlist.current
-            self._config.set("last_track_path", cur.path if cur else "")
-            self._config.save()
-            # 保存当前队列为隐藏的 queue.m3u8
-            m3u.write_file(QUEUE_CACHE_PATH, "queue", self._playlist.paths)
-            # 保存由于随机播放之前的原始队列 (存在的话) 为 queue_original.m3u8
-            orig_paths = self._playlist.original_paths
-            if orig_paths is not None:
-                m3u.write_file(QUEUE_ORIGINAL_CACHE_PATH, "queue_original", orig_paths)
-            elif os.path.isfile(QUEUE_ORIGINAL_CACHE_PATH):
-                os.remove(QUEUE_ORIGINAL_CACHE_PATH)
-        except Exception:
-            pass
+        if not getattr(self._config, "_factory_reset", False):
+            try:
+                self._config.set("volume", self._engine.get_volume())
+                # 新版双字段(主)
+                self._config.set("shuffled", self._playlist.shuffled)
+                self._config.set("repeat", self._playlist.repeat.value)
+                # 旧字段保留,这样降级也能凑合识别(可能损失 shuffled+repeat 同开的信息)
+                self._config.set("play_mode", self._playlist.mode.value)
+                self._config.set("last_position_ms", self._engine.get_position())
+                cur = self._playlist.current
+                self._config.set("last_track_path", cur.path if cur else "")
+                self._config.save()
+                # 保存当前队列为隐藏的 queue.m3u8
+                m3u.write_file(QUEUE_CACHE_PATH, "queue", self._playlist.paths)
+                # 保存由于随机播放之前的原始队列 (存在的话) 为 queue_original.m3u8
+                orig_paths = self._playlist.original_paths
+                if orig_paths is not None:
+                    m3u.write_file(QUEUE_ORIGINAL_CACHE_PATH, "queue_original", orig_paths)
+                elif os.path.isfile(QUEUE_ORIGINAL_CACHE_PATH):
+                    os.remove(QUEUE_ORIGINAL_CACHE_PATH)
+            except Exception:
+                pass
         try:
             self._engine.release()
         except Exception:
