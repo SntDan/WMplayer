@@ -99,7 +99,7 @@ class SettingsDialog(QDialog):
         # 默认目录(置顶、灰色、不可改)
         v.addWidget(_make_default_label("默认目录:", default_library_dir()))
 
-        v.addWidget(QLabel("额外的曲库根目录:"))
+        v.addWidget(QLabel("其他曲库目录:"))
         self.lst_folders = QListWidget()
         self.lst_folders.setStyleSheet(
             "QListWidget{border:1px solid #333; background:#0a0a0a;}"
@@ -142,7 +142,7 @@ class SettingsDialog(QDialog):
 
         v.addWidget(_make_default_label("默认目录:", default_playlists_dir()))
 
-        v.addWidget(QLabel("额外的歌单源(文件夹或单独的 .m3u8 文件):"))
+        v.addWidget(QLabel("其他歌单源或.m3u8文件:"))
         self.lst_playlist_locs = QListWidget()
         self.lst_playlist_locs.setStyleSheet(
             "QListWidget{border:1px solid #333; background:#0a0a0a;}"
@@ -183,8 +183,7 @@ class SettingsDialog(QDialog):
             return  # 默认目录隐式包含
         if self._list_contains(self.lst_playlist_locs, ap, by_data=True):
             return
-        kind = "文件夹" if os.path.isdir(ap) else "文件"
-        it = QListWidgetItem(f"[{kind}] {ap}")
+        it = QListWidgetItem(f"{ap}")
         it.setData(Qt.ItemDataRole.UserRole, ap)
         self.lst_playlist_locs.addItem(it)
 
