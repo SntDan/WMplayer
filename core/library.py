@@ -100,11 +100,10 @@ class _ScanRunnable(QRunnable):
             if (i + 1) % 25 == 0 or (i + 1) == total:
                 self._signals.progress.emit(i + 1, total)
 
-        # 排序:艺术家 → 专辑 → 标题
+        # 排序:歌名首字母(忽略大小写),并列时再用艺术家做次序
         results.sort(key=lambda t: (
-            (t.artist or "").lower(),
-            (t.album or "").lower(),
             (t.title or "").lower(),
+            (t.artist or "").lower(),
         ))
         self._signals.finished.emit(results)
 

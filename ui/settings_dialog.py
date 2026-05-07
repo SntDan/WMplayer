@@ -16,7 +16,6 @@ from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
     QDialog,
-    QDialogButtonBox,
     QFileDialog,
     QFormLayout,
     QFrame,
@@ -24,6 +23,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QListWidget,
     QListWidgetItem,
+    QMenu,
     QMessageBox,
     QPushButton,
     QSlider,
@@ -38,7 +38,7 @@ from core.config import (
     default_library_dir, default_playlists_dir,
 )
 from core.thumbnails import THUMB_DIR
-from ui.theme import BTN_QSS as _BTN_QSS
+from ui.theme import BTN_QSS as _BTN_QSS, PRIMARY_BTN_QSS
 
 
 _LOCKED_DEFAULT_QSS = (
@@ -81,12 +81,22 @@ class SettingsDialog(QDialog):
         about.setWordWrap(True)
         layout.addWidget(about)
 
-        btns = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        # 与"返回""播放全部"同款的红底大按钮
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
+        btn_row.addStretch(1)
+        big_btn_qss = PRIMARY_BTN_QSS.replace(
+            "padding:6px 12px", "padding:10px 28px;font-size:14px"
         )
-        btns.accepted.connect(self.accept)
-        btns.rejected.connect(self.reject)
-        layout.addWidget(btns)
+        self._btn_cancel = QPushButton("Cancel")
+        self._btn_ok = QPushButton("OK")
+        for b, slot in ((self._btn_cancel, self.reject), (self._btn_ok, self.accept)):
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setStyleSheet(big_btn_qss)
+            b.setMinimumWidth(120)
+            b.clicked.connect(slot)
+            btn_row.addWidget(b)
+        layout.addLayout(btn_row)
 
     # ------------------------------------------------------------------
     # 曲库 tab
@@ -152,18 +162,24 @@ class SettingsDialog(QDialog):
         v.addWidget(self.lst_playlist_locs, 1)
 
         row = QHBoxLayout()
-        b_add_dir = QPushButton("+ 添加文件夹")
-        b_add_file = QPushButton("+ 添加歌单文件")
+        b_add = QPushButton("+ 添加文件(文件夹)")
+        b_add.setCursor(Qt.CursorShape.PointingHandCursor)
+        b_add.setStyleSheet(_BTN_QSS)
+        # 单按钮 + 下拉菜单: 用户在"文件夹"和"歌单文件"间二选一
+        add_menu = QMenu(b_add)
+        add_menu.addAction("选择文件夹…", self._add_playlist_folder)
+        add_menu.addAction("选择 .m3u8 文件…", self._add_playlist_file)
+        b_add.setMenu(add_menu)
+
         b_remove = QPushButton("移除选中")
-        for b in (b_add_dir, b_add_file, b_remove):
-            b.setCursor(Qt.CursorShape.PointingHandCursor)
-            b.setStyleSheet(_BTN_QSS)
-            row.addWidget(b)
+        b_remove.setCursor(Qt.CursorShape.PointingHandCursor)
+        b_remove.setStyleSheet(_BTN_QSS)
+        b_remove.clicked.connect(lambda: self._remove_selected(self.lst_playlist_locs))
+
+        row.addWidget(b_add)
+        row.addWidget(b_remove)
         row.addStretch(1)
         v.addLayout(row)
-        b_add_dir.clicked.connect(self._add_playlist_folder)
-        b_add_file.clicked.connect(self._add_playlist_file)
-        b_remove.clicked.connect(lambda: self._remove_selected(self.lst_playlist_locs))
 
         hint = QLabel(
             "<div style='color:#888;font-size:11px;'>"

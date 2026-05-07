@@ -3,10 +3,12 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QPushButton, QVBoxLayout, QWidget, QStackedWidget
+    QVBoxLayout, QWidget, QStackedWidget
 )
 from core.library import Library
 from core.metadata import TrackMetadata
+from core.thumbnails import thumb_path_for
+from ui.list_delegates import CoverRowDelegate, ROLE_SUBTITLE, ROLE_THUMB_PATH
 
 class ArtistsPanel(QWidget):
     play_paths_now = pyqtSignal(list, int)
@@ -50,6 +52,11 @@ class ArtistsPanel(QWidget):
         self.list_artists = QListWidget()
         self.list_artists.setTextElideMode(Qt.TextElideMode.ElideRight)
         self.list_artists.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.list_artists.setUniformItemSizes(True)
+        self.list_artists.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
+        self.list_artists.setMouseTracking(True)
+        self._row_delegate = CoverRowDelegate(self.list_artists)
+        self.list_artists.setItemDelegate(self._row_delegate)
         l0.addWidget(self.list_artists)
         self.stack.addWidget(self.page_list)
 
@@ -64,7 +71,7 @@ class ArtistsPanel(QWidget):
     def _wire(self) -> None:
         self._library.tracks_changed.connect(self.refresh)
         self.search_box.textChanged.connect(self._apply_filter)
-        self.list_artists.itemDoubleClicked.connect(self._on_artist_clicked)
+        # 单信号: 单击进入(避免双击触发两次重复加载)
         self.list_artists.itemClicked.connect(self._on_artist_clicked)
 
     def refresh(self) -> None:
@@ -74,18 +81,25 @@ class ArtistsPanel(QWidget):
             if artist not in self._artists_tracks:
                 self._artists_tracks[artist] = []
             self._artists_tracks[artist].append(t)
-            
+
         # 按照专辑排序，保证“一个一个专辑播放”
         for artist in self._artists_tracks:
             self._artists_tracks[artist].sort(key=lambda t: (t.album or "", t.title or ""))
-        
+
         self.list_artists.clear()
         artists = sorted(self._artists_tracks.keys())
         for a in artists:
+            tracks = self._artists_tracks[a]
             it = QListWidgetItem(a)
             it.setData(Qt.ItemDataRole.UserRole, a)
+            if tracks:
+                # 用该歌手「首张专辑」首曲的封面缩略图
+                it.setData(ROLE_THUMB_PATH, thumb_path_for(tracks[0].path))
+                # 副标题: 该歌手有几张专辑
+                album_count = len({t.album for t in tracks})
+                it.setData(ROLE_SUBTITLE, f"{album_count} 张专辑")
             self.list_artists.addItem(it)
-        
+
         self.artist_count.setText(f"{len(artists)} 位歌手")
         self._apply_filter(self.search_box.text())
 
