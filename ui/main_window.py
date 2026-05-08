@@ -247,7 +247,7 @@ class MainWindow(QMainWindow):
         pp.settings_clicked.connect(self._on_settings)
         pp.artist_double_clicked.connect(self._on_player_artist_double_clicked)
         pp.album_double_clicked.connect(self._on_player_album_double_clicked)
-        pp.width_locked.connect(self.right_panel.setFixedWidth)
+        pp.width_locked.connect(self._on_player_width_locked)
 
         # 引擎事件
         self._engine.position_changed.connect(self.player_panel.set_position)
@@ -309,8 +309,6 @@ class MainWindow(QMainWindow):
         _sc("Up", lambda: self._engine.set_volume(min(100, self._engine.get_volume() + 5)))
         _sc("Down", lambda: self._engine.set_volume(max(0, self._engine.get_volume() - 5)))
 
-<<<<<<< Updated upstream
-=======
     def _on_player_width_locked(self, w: int) -> None:
         # 右侧最小宽度 = 左侧, 但允许更宽 (用户向右拖右边界时, 右侧吃掉所有多余空间)。
         # 同时把窗口的最小宽度锁成 (左 + 1px 分隔线 + 右), 不允许再缩。
@@ -323,7 +321,6 @@ class MainWindow(QMainWindow):
         if self.width() < target:
             self.resize(target, self.height())
 
->>>>>>> Stashed changes
     def _on_player_artist_double_clicked(self) -> None:
         track = self._playlist.current
         if track and track.artist:
