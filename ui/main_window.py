@@ -227,8 +227,7 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(self.player_panel, 0)   # 不 stretch,宽度自锁
         layout.addWidget(sep, 0)
-        layout.addWidget(right, 0)               # 宽度跟随左侧
-        layout.addStretch(1)                     # 多余空间留在最右侧
+        layout.addWidget(right, 1)               # 最小宽度 = 左侧,多余宽度全部吃掉
 
     def _wire(self) -> None:
         # 顶部 segmented ↔ stack
@@ -310,6 +309,21 @@ class MainWindow(QMainWindow):
         _sc("Up", lambda: self._engine.set_volume(min(100, self._engine.get_volume() + 5)))
         _sc("Down", lambda: self._engine.set_volume(max(0, self._engine.get_volume() - 5)))
 
+<<<<<<< Updated upstream
+=======
+    def _on_player_width_locked(self, w: int) -> None:
+        # 右侧最小宽度 = 左侧, 但允许更宽 (用户向右拖右边界时, 右侧吃掉所有多余空间)。
+        # 同时把窗口的最小宽度锁成 (左 + 1px 分隔线 + 右), 不允许再缩。
+        # 只在当前窗口比这个最小值还窄时才主动放大,
+        # 用户已经拖大的尺寸保留, 避免拖动时窗口"反弹"乱闪。
+        self.right_panel.setMinimumWidth(w)
+        self.right_panel.setMaximumWidth(16777215)
+        target = w + 1 + w
+        self.setMinimumWidth(target)
+        if self.width() < target:
+            self.resize(target, self.height())
+
+>>>>>>> Stashed changes
     def _on_player_artist_double_clicked(self) -> None:
         track = self._playlist.current
         if track and track.artist:
