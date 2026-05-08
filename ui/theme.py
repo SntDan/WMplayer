@@ -64,9 +64,9 @@ QListWidget {
     padding: 4px;
 }
 QListWidget::item {
-    padding: 8px 10px;
-    border-radius: 4px;
-    margin-bottom: 2px;
+    padding: 0;
+    border-radius: 0;
+    margin: 0;
 }
 QListWidget::item:hover {
     background-color: #1F1F1F;
@@ -78,19 +78,36 @@ QListWidget::item:selected {
 
 QScrollBar:vertical {
     background: transparent;
-    width: 8px;
-    margin: 4px 0;
+    width: 4px;
+    margin: 2px 0;
 }
 QScrollBar::handle:vertical {
-    background: #444444;
-    border-radius: 4px;
+    background: #1f1f1f;
+    border-radius: 2px;
     min-height: 24px;
 }
 QScrollBar::handle:vertical:hover {
-    background: #666666;
+    background: #333333;
 }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     height: 0;
+    background: transparent;
+}
+QScrollBar:horizontal {
+    background: transparent;
+    height: 4px;
+    margin: 0 2px;
+}
+QScrollBar::handle:horizontal {
+    background: #1f1f1f;
+    border-radius: 2px;
+    min-width: 24px;
+}
+QScrollBar::handle:horizontal:hover {
+    background: #333333;
+}
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0;
     background: transparent;
 }
 

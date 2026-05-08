@@ -123,7 +123,11 @@ class Library(QObject):
         super().__init__(parent)
         self._cache_path = cache_path
         self._folders: List[str] = []
+        # _tracks 是磁盘上的全量曲目 (用于 path 查找/缓存持久化),
+        # _display_tracks 是按 (歌名/歌手/专辑) 去重后只保留最高规格的视图,
+        # 暴露给 UI; 队列里若引用了被去重掉的路径, find_by_path 仍能命中。
         self._tracks: List[TrackMetadata] = []
+        self._display_tracks: List[TrackMetadata] = []
         self._path_map: Optional[Dict[str, TrackMetadata]] = None
         self._scanning = False
         # 扫描信号(单实例,长期存在,与 worker 安全跨线程通信)
@@ -132,6 +136,7 @@ class Library(QObject):
         self._signals.finished.connect(self._on_scan_finished)
         # 启动加载缓存
         self._load_cache()
+        self._rebuild_display()
 
     # ------------------------------------------------------------------
     # 数据访问
@@ -142,22 +147,39 @@ class Library(QObject):
 
     @property
     def tracks(self) -> List[TrackMetadata]:
-        return self._tracks
+        return self._display_tracks
 
     def __len__(self) -> int:
-        return len(self._tracks)
+        return len(self._display_tracks)
 
     def find_by_path(self, path: str) -> Optional[TrackMetadata]:
         if self._path_map is None:
             self._path_map = {t.path: t for t in self._tracks}
         return self._path_map.get(path)
 
+    def _rebuild_display(self) -> None:
+        """同名同歌手同专辑只保留规格最高的一条。"""
+        best: Dict[tuple, TrackMetadata] = {}
+        order: List[tuple] = []
+        for t in self._tracks:
+            key = (
+                (t.title or "").strip().lower(),
+                (t.artist or "").strip().lower(),
+                (t.album or "").strip().lower(),
+            )
+            if key not in best:
+                order.append(key)
+                best[key] = t
+            elif _spec_score(t) > _spec_score(best[key]):
+                best[key] = t
+        self._display_tracks = [best[k] for k in order]
+
     def search(self, query: str) -> List[TrackMetadata]:
         q = (query or "").strip().lower()
         if not q:
-            return list(self._tracks)
+            return list(self._display_tracks)
         return [
-            t for t in self._tracks
+            t for t in self._display_tracks
             if q in (t.title or "").lower()
             or q in (t.artist or "").lower()
             or q in (t.album or "").lower()
@@ -215,6 +237,7 @@ class Library(QObject):
     def _on_scan_finished(self, tracks) -> None:
         self._tracks = list(tracks)
         self._path_map = None  # 失效旧的 path 索引
+        self._rebuild_display()
         self._scanning = False
         self._save_cache()
         self.tracks_changed.emit()
@@ -300,3 +323,13 @@ def _safe_mtime(path: str) -> float:
         return os.path.getmtime(path)
     except OSError:
         return 0.0
+
+
+def _spec_score(t: TrackMetadata) -> tuple:
+    """规格越高分数越大: 先看是否 HR, 再看位深 / 采样率 / 时长。"""
+    return (
+        1 if t.is_high_res() else 0,
+        t.bits_per_sample or 0,
+        t.sample_rate or 0,
+        t.duration_ms or 0,
+    )

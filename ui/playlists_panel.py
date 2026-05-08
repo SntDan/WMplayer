@@ -82,6 +82,7 @@ class PlaylistsPanel(QWidget):
         self.list.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
         self.list.setUniformItemSizes(True)
         self.list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         outer.addWidget(self.list, 1)
 
     def _wire(self) -> None:

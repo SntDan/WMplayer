@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
 from core.library import Library
 from core.metadata import TrackMetadata
 from core.thumbnails import thumb_path_for
-from ui.list_delegates import CoverRowDelegate, ROLE_SUBTITLE, ROLE_THUMB_PATH
+from ui.list_delegates import CoverRowDelegate, ROLE_IS_HR, ROLE_SUBTITLE, ROLE_THUMB_PATH
 from ui.theme import PRIMARY_BTN_QSS
 
 class ElidedLabel(QLabel):
@@ -236,6 +236,7 @@ class AlbumsPanel(QWidget):
             if tracks:
                 it.setData(ROLE_THUMB_PATH, thumb_path_for(tracks[0].path))
                 it.setData(ROLE_SUBTITLE, tracks[0].artist or "")
+                it.setData(ROLE_IS_HR, all(t.is_high_res() for t in tracks))
             self.list_albums.addItem(it)
             
         if self._embedded and self._filter_artist:
@@ -308,6 +309,7 @@ class AlbumsPanel(QWidget):
             it.setData(Qt.ItemDataRole.UserRole, t.path)
             it.setData(ROLE_THUMB_PATH, thumb_path_for(t.path))
             it.setData(ROLE_SUBTITLE, t.artist or "")
+            it.setData(ROLE_IS_HR, t.is_high_res())
             self.list_tracks.addItem(it)
             
         self.stack.setCurrentIndex(1)

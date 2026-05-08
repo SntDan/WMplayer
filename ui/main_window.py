@@ -201,6 +201,7 @@ class MainWindow(QMainWindow):
 
         # 右:segmented + stacked
         right = QWidget()
+        self.right_panel = right
         rv = QVBoxLayout(right)
         rv.setContentsMargins(0, 0, 0, 0)
         rv.setSpacing(0)
@@ -226,7 +227,8 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(self.player_panel, 0)   # 不 stretch,宽度自锁
         layout.addWidget(sep, 0)
-        layout.addWidget(right, 1)               # 吃所有富余
+        layout.addWidget(right, 0)               # 宽度跟随左侧
+        layout.addStretch(1)                     # 多余空间留在最右侧
 
     def _wire(self) -> None:
         # 顶部 segmented ↔ stack
@@ -246,6 +248,7 @@ class MainWindow(QMainWindow):
         pp.settings_clicked.connect(self._on_settings)
         pp.artist_double_clicked.connect(self._on_player_artist_double_clicked)
         pp.album_double_clicked.connect(self._on_player_album_double_clicked)
+        pp.width_locked.connect(self.right_panel.setFixedWidth)
 
         # 引擎事件
         self._engine.position_changed.connect(self.player_panel.set_position)

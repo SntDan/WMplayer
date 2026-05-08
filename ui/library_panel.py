@@ -26,7 +26,7 @@ from PyQt6.QtWidgets import (
 
 from core.library import Library
 from core.thumbnails import thumb_path_for
-from ui.list_delegates import CoverRowDelegate, ROLE_SUBTITLE, ROLE_THUMB_PATH
+from ui.list_delegates import CoverRowDelegate, ROLE_IS_HR, ROLE_SUBTITLE, ROLE_THUMB_PATH
 from ui.theme import BTN_QSS as _BTN_QSS
 
 
@@ -93,6 +93,8 @@ class LibraryPanel(QWidget):
         self.list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.list.setMouseTracking(True)
+        self.list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.list.setTextElideMode(Qt.TextElideMode.ElideRight)
         self._row_delegate = CoverRowDelegate(self.list)
         self.list.setItemDelegate(self._row_delegate)
         outer.addWidget(self.list, 1)
@@ -122,6 +124,7 @@ class LibraryPanel(QWidget):
             it.setData(Qt.ItemDataRole.UserRole, t.path)
             it.setData(ROLE_THUMB_PATH, thumb_path_for(t.path))
             it.setData(ROLE_SUBTITLE, t.artist or "")
+            it.setData(ROLE_IS_HR, t.is_high_res())
             hay = f"{t.title or ''} {t.artist or ''} {t.album or ''}".lower()
             it.setData(self._ROLE_FILTER_HAY, hay)
             self.list.addItem(it)

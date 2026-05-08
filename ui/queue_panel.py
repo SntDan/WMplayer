@@ -30,6 +30,7 @@ from core.playlist import Playlist
 from core.thumbnails import thumb_path_for
 from ui.list_delegates import (
     CoverRowDelegate,
+    ROLE_IS_HR,
     ROLE_IS_PLAYING,
     ROLE_SUBTITLE,
     ROLE_THUMB_PATH,
@@ -89,6 +90,8 @@ class QueuePanel(QWidget):
         self.list.setUniformItemSizes(True)
         self.list.setMouseTracking(True)
         self.list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.list.setTextElideMode(Qt.TextElideMode.ElideRight)
         self._row_delegate = CoverRowDelegate(self.list)
         self.list.setItemDelegate(self._row_delegate)
         outer.addWidget(self.list, 1)
@@ -115,6 +118,7 @@ class QueuePanel(QWidget):
             it.setData(Qt.ItemDataRole.UserRole, i)
             it.setData(ROLE_THUMB_PATH, thumb_path_for(t.path))
             it.setData(ROLE_SUBTITLE, t.artist or "")
+            it.setData(ROLE_IS_HR, t.is_high_res())
             self.list.addItem(it)
         self.count_label.setText(f"{len(self._playlist)} 首")
         self._highlight_current()

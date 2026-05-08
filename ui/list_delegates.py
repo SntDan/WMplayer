@@ -14,8 +14,8 @@ from __future__ import annotations
 import os
 from typing import Optional
 
-from PyQt6.QtCore import QRect, QSize, Qt
-from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPixmap, QPixmapCache
+from PyQt6.QtCore import QRect, QRectF, QSize, Qt
+from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen, QPixmap, QPixmapCache
 from PyQt6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem
 
 
@@ -27,14 +27,22 @@ QPixmapCache.setCacheLimit(60 * 1024)  # 60 MB
 ROLE_THUMB_PATH = Qt.ItemDataRole.UserRole + 1
 ROLE_SUBTITLE = Qt.ItemDataRole.UserRole + 2
 ROLE_IS_PLAYING = Qt.ItemDataRole.UserRole + 3
+ROLE_IS_HR = Qt.ItemDataRole.UserRole + 4
+
+
+_HR_BADGE_W = 26
+_HR_BADGE_H = 16
+_HR_GOLD = QColor("#D4AF37")
+_SEPARATOR_COLOR = QColor("#2a2a2a")
 
 
 class CoverRowDelegate(QStyledItemDelegate):
     """带封面缩略图 + 上下两行文字的列表项绘制器。"""
 
-    THUMB_PX = 44
+    THUMB_PX = 52
     PAD = 10
-    ROW_H = 60
+    ROW_H = 53                     # 比封面多 1px,留给底部分隔线
+    HR_RESERVED_W = _HR_BADGE_W + 12   # 右侧给 HR 徽章预留的横向空间
 
     def sizeHint(self, option: QStyleOptionViewItem, index) -> QSize:  # noqa: N802
         return QSize(option.rect.width() if option.rect.width() > 0 else 200, self.ROW_H)
@@ -42,6 +50,7 @@ class CoverRowDelegate(QStyledItemDelegate):
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index) -> None:
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         rect = option.rect
 
         # 背景: 选中 / 悬停
@@ -50,9 +59,9 @@ class CoverRowDelegate(QStyledItemDelegate):
         elif option.state & QStyle.StateFlag.State_MouseOver:
             painter.fillRect(rect, QColor("#1a1a1a"))
 
-        # 缩略图
-        thumb_x = rect.left() + self.PAD
-        thumb_y = rect.top() + (rect.height() - self.THUMB_PX) // 2
+        # 缩略图: 顶对齐, 紧贴左边 (封面间无空隙, 仅由底部分隔线分开)
+        thumb_x = rect.left()
+        thumb_y = rect.top()
         thumb_rect = QRect(thumb_x, thumb_y, self.THUMB_PX, self.THUMB_PX)
 
         thumb_path = index.data(ROLE_THUMB_PATH)
@@ -67,10 +76,20 @@ class CoverRowDelegate(QStyledItemDelegate):
             painter.setFont(f)
             painter.drawText(thumb_rect, Qt.AlignmentFlag.AlignCenter, "♪")
 
-        # 文字区
+        # HR 徽章 (右侧固定位置, 占的位置无论是否显示都保留, 让其他歌曲对齐)
+        is_hr = bool(index.data(ROLE_IS_HR))
+        badge_right = rect.right() - self.PAD
+        badge_left = badge_right - _HR_BADGE_W
+        if is_hr:
+            badge_y = rect.top() + (self.THUMB_PX - _HR_BADGE_H) // 2
+            badge_rect = QRect(badge_left, badge_y, _HR_BADGE_W, _HR_BADGE_H)
+            self._paint_hr_badge(painter, badge_rect, option.font)
+
+        # 文字区: 起点 = 封面右 + PAD, 终点 = HR 区域左 - PAD
         text_x = thumb_rect.right() + self.PAD
-        text_w = rect.right() - text_x - self.PAD
+        text_w = badge_left - self.PAD - text_x
         if text_w < 30:
+            self._paint_separator(painter, rect)
             painter.restore()
             return
 
@@ -96,9 +115,9 @@ class CoverRowDelegate(QStyledItemDelegate):
         sub_fm = QFontMetrics(sub_font)
         sub_h = sub_fm.height()
 
-        # 垂直居中两行
+        # 垂直居中两行 (限制在封面高度内, 底部 1px 留给分隔线)
         block_h = title_h + 2 + sub_h
-        block_top = rect.top() + (rect.height() - block_h) // 2
+        block_top = rect.top() + (self.THUMB_PX - block_h) // 2
 
         title_rect = QRect(text_x, block_top, text_w, title_h)
         elided_title = title_fm.elidedText(str(title), Qt.TextElideMode.ElideRight, text_w)
@@ -118,6 +137,33 @@ class CoverRowDelegate(QStyledItemDelegate):
             elided_sub,
         )
 
+        # 底部 1px 灰色分隔线
+        self._paint_separator(painter, rect)
+
+        painter.restore()
+
+    @staticmethod
+    def _paint_separator(painter: QPainter, rect: QRect) -> None:
+        painter.setPen(_SEPARATOR_COLOR)
+        y = rect.bottom()
+        painter.drawLine(rect.left(), y, rect.right(), y)
+
+    @staticmethod
+    def _paint_hr_badge(painter: QPainter, rect: QRect, base_font: QFont) -> None:
+        painter.save()
+        pen = QPen(_HR_GOLD)
+        pen.setWidthF(1.2)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(
+            QRectF(rect.x() + 0.5, rect.y() + 0.5, rect.width() - 1, rect.height() - 1), 3, 3
+        )
+        f = QFont(base_font)
+        f.setPointSize(8)
+        f.setBold(True)
+        painter.setFont(f)
+        painter.setPen(_HR_GOLD)
+        painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, "HR")
         painter.restore()
 
     @staticmethod

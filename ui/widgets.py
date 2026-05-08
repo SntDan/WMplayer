@@ -20,7 +20,6 @@ from PyQt6.QtCore import (
     QRectF,
     QSize,
     Qt,
-    QTimer,
     pyqtSignal,
 )
 from PyQt6.QtGui import (
@@ -456,20 +455,25 @@ class ProgressBar(QWidget):
 # 滚动文本(供长歌名用)
 # ----------------------------------------------------------------------
 class ScrollingLabel(QLabel):
+    """长文本时左右往返滚动。
+
+    - 不再持有内部 QTimer; 由外部 (PlayerPanel) 统一驱动 ``tick()``,
+      使多个标签的滚动节奏完全同步。
+    - 支持双击信号, 可替代单独的 ClickableLabel。
+    """
+
+    double_clicked = pyqtSignal()
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._offset = 0
-        self._timer = QTimer(self)
-        self._timer.timeout.connect(self._tick)
         self._direction = 1
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # 关键: 水平方向 Ignored, 这样无论文字多长都不会向父布局请求更多宽度,
-        # 防止切歌时父级 PlayerPanel 的 sizeHint 跟着变,从而抖动 splitter
+        # 水平方向 Ignored: 无论文字多长都不会向父布局请求更多宽度
         sp = QSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.setSizePolicy(sp)
 
     def sizeHint(self) -> QSize:  # noqa: N802
-        # 高度跟随字体,宽度返回 0(由父布局决定实际显示宽度)
         fm = self.fontMetrics()
         return QSize(0, fm.height() + 4)
 
@@ -479,37 +483,33 @@ class ScrollingLabel(QLabel):
     def setText(self, text: str) -> None:  # noqa: N802
         super().setText(text)
         self._offset = 0
-        self._maybe_start_timer()
+        self._direction = 1
+        self.update()
 
-    def _maybe_start_timer(self) -> None:
-        # 仅当 widget 可见且文本超出宽度才启用滚动定时器
-        if not self.isVisible():
-            self._timer.stop()
+    def needs_scroll(self) -> bool:
+        """文字宽度是否超出可视宽度。"""
+        return self.fontMetrics().horizontalAdvance(self.text()) > max(1, self.width())
+
+    def tick(self) -> None:
+        """由外部统一计时器驱动一格滚动。"""
+        if not self.needs_scroll() or not self.isVisible():
             return
-        fm = self.fontMetrics()
-        if fm.horizontalAdvance(self.text()) > self.width():
-            if not self._timer.isActive():
-                self._timer.start(30)
-        else:
-            self._timer.stop()
-
-    def showEvent(self, e):  # noqa: N802
-        super().showEvent(e)
-        self._maybe_start_timer()
-
-    def hideEvent(self, e):  # noqa: N802
-        super().hideEvent(e)
-        self._timer.stop()
-
-    def _tick(self) -> None:
         self._offset += self._direction
         fm = self.fontMetrics()
         max_off = fm.horizontalAdvance(self.text()) - self.width() + 20
-        if self._offset >= max_off:
+        if max_off <= 0:
+            self._offset = 0
+            self._direction = 1
+        elif self._offset >= max_off:
             self._direction = -1
         elif self._offset <= 0:
             self._direction = 1
         self.update()
+
+    def mouseDoubleClickEvent(self, e):  # noqa: N802
+        super().mouseDoubleClickEvent(e)
+        if e.button() == Qt.MouseButton.LeftButton:
+            self.double_clicked.emit()
 
     def paintEvent(self, e) -> None:  # noqa: N802
         fm = self.fontMetrics()

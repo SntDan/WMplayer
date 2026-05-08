@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QHBoxLayout,
@@ -39,14 +39,6 @@ def _format_ms(ms: int) -> str:
     return f"{s // 60:02d}:{s % 60:02d}"
 
 
-class ClickableLabel(QLabel):
-    double_clicked = pyqtSignal()
-
-    def mouseDoubleClickEvent(self, e):
-        super().mouseDoubleClickEvent(e)
-        if e.button() == Qt.MouseButton.LeftButton:
-            self.double_clicked.emit()
-
 class PlayerPanel(QWidget):
     # 与外部交互的信号
     play_pause_clicked = pyqtSignal()
@@ -61,6 +53,7 @@ class PlayerPanel(QWidget):
     library_clicked = pyqtSignal()
     artist_double_clicked = pyqtSignal()
     album_double_clicked = pyqtSignal()
+    width_locked = pyqtSignal(int)
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -69,6 +62,11 @@ class PlayerPanel(QWidget):
         self._shuffled: bool = False
         self._repeat: RepeatMode = RepeatMode.NONE
         self._refresh_mode_buttons()
+        # 三个滚动标签共享同一个计时器, 保证多行同步前进
+        self._scroll_timer = QTimer(self)
+        self._scroll_timer.setInterval(30)
+        self._scroll_timer.timeout.connect(self._tick_scrolling_labels)
+        self._scroll_timer.start()
 
     # ------------------------------------------------------------------
     # UI 构建
@@ -116,36 +114,42 @@ class PlayerPanel(QWidget):
 
         below.addSpacerItem(QSpacerItem(0, 6))
 
-        # ---- 4. 歌曲信息 Song / Artist / Album (全部居中) ----
-        # 三个标签都用水平 Ignored 的 size policy: 切歌时无论文字多长
-        # 都不会向父布局请求更多宽度,从而避免 splitter 分界线抖动
-        info_sp = QSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-
+        # ---- 4. 歌曲信息 Song / Artist / Album ----
+        # 三个标签放进一个比面板更窄的居中容器, 任何一行超长就同步左右滚动。
         self.lbl_title = ScrollingLabel(self)
-        f = QFont(); f.setPointSize(23); f.setBold(True)
+        f = QFont(); f.setPointSize(20); f.setBold(True)
         self.lbl_title.setFont(f)
-        self.lbl_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_title.setText("Song")
 
-        self.lbl_artist = ClickableLabel("Artist", self)
-        f = QFont(); f.setPointSize(16)
-        self.lbl_artist.setFont(f)
-        self.lbl_artist.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_artist.setSizePolicy(info_sp)
+        self.lbl_artist = ScrollingLabel(self)
+        f_artist = QFont(); f_artist.setPointSize(14)
+        self.lbl_artist.setFont(f_artist)
+        self.lbl_artist.setText("Artist")
         self.lbl_artist.setCursor(Qt.CursorShape.PointingHandCursor)
         self.lbl_artist.double_clicked.connect(self.artist_double_clicked.emit)
 
-        self.lbl_album = ClickableLabel("Album", self)
-        self.lbl_album.setFont(f)
+        self.lbl_album = ScrollingLabel(self)
+        f_album = QFont(); f_album.setPointSize(12)
+        self.lbl_album.setFont(f_album)
         self.lbl_album.setStyleSheet("color: #9E9E9E;")
-        self.lbl_album.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_album.setSizePolicy(info_sp)
+        self.lbl_album.setText("Album")
         self.lbl_album.setCursor(Qt.CursorShape.PointingHandCursor)
         self.lbl_album.double_clicked.connect(self.album_double_clicked.emit)
 
-        below.addWidget(self.lbl_title)
-        below.addWidget(self.lbl_artist)
-        below.addWidget(self.lbl_album)
+        self._info_container = QWidget(self)
+        info_layout = QVBoxLayout(self._info_container)
+        info_layout.setContentsMargins(0, 0, 0, 0)
+        info_layout.setSpacing(6)
+        info_layout.addWidget(self.lbl_title)
+        info_layout.addWidget(self.lbl_artist)
+        info_layout.addWidget(self.lbl_album)
+
+        info_row = QHBoxLayout()
+        info_row.setContentsMargins(0, 0, 0, 0)
+        info_row.addStretch(1)
+        info_row.addWidget(self._info_container, 0)
+        info_row.addStretch(1)
+        below.addLayout(info_row)
 
         below.addSpacerItem(QSpacerItem(0, 6))
 
@@ -330,3 +334,16 @@ class PlayerPanel(QWidget):
         ideal_w = max(280, ideal_w)
         if self.maximumWidth() != ideal_w or self.minimumWidth() != ideal_w:
             self.setFixedWidth(ideal_w)
+            self.width_locked.emit(ideal_w)
+
+        # 信息区(歌名/歌手/专辑)宽度: 面板的 ~62%, 留出左右空白
+        info = getattr(self, "_info_container", None)
+        if info is not None:
+            info_w = max(200, min(380, int(ideal_w * 0.62)))
+            if info.maximumWidth() != info_w or info.minimumWidth() != info_w:
+                info.setFixedWidth(info_w)
+
+    def _tick_scrolling_labels(self) -> None:
+        # 同一计时器驱动三个标签, 哪一行需要滚动它就走一格, 多行天然同步
+        for lbl in (self.lbl_title, self.lbl_artist, self.lbl_album):
+            lbl.tick()
