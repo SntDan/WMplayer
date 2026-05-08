@@ -33,15 +33,14 @@ ROLE_IS_HR = Qt.ItemDataRole.UserRole + 4
 _HR_BADGE_W = 26
 _HR_BADGE_H = 16
 _HR_GOLD = QColor("#D4AF37")
-_SEPARATOR_COLOR = QColor("#3a3a3a")
 
 
 class CoverRowDelegate(QStyledItemDelegate):
-    """带封面缩略图 + 上下两行文字的列表项绘制器。"""
+    """带封面缩落图 + 上下两行文字的列表项绘制器。"""
 
     THUMB_PX = 52
     PAD = 10
-    ROW_H = 53                     # 封面 52 + 底部 1px 灰线 (行间唯一的"间隔")
+    ROW_H = 52                     # 等于封面尺寸, 行与行之间封面完全贴合, 零间隙
     HR_RESERVED_W = _HR_BADGE_W + 12   # 右侧给 HR 徽章预留的横向空间
 
     def sizeHint(self, option: QStyleOptionViewItem, index) -> QSize:  # noqa: N802
@@ -135,11 +134,6 @@ class CoverRowDelegate(QStyledItemDelegate):
             Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
             elided_sub,
         )
-
-        # 行底部 1px 灰线 (行间唯一的分隔, 上下封面紧贴)
-        painter.setPen(_SEPARATOR_COLOR)
-        y = rect.bottom()
-        painter.drawLine(rect.left(), y, rect.right(), y)
 
         painter.restore()
 

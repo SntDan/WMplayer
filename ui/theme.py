@@ -77,17 +77,18 @@ QListWidget::item:selected {
 }
 
 QScrollBar:vertical {
-    background: transparent;
-    width: 4px;
-    margin: 2px 0;
+    background: #000000;
+    width: 12px;
+    margin: 2px 4px;
+    border: none;
 }
 QScrollBar::handle:vertical {
-    background: #1f1f1f;
+    background: #FFFFFF;
     border-radius: 2px;
     min-height: 24px;
 }
 QScrollBar::handle:vertical:hover {
-    background: #333333;
+    background: #FFFFFF;
 }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     height: 0;
