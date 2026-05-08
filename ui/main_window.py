@@ -196,7 +196,7 @@ class MainWindow(QMainWindow):
         # 中间分隔线
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.NoFrame)
-        sep.setStyleSheet("background-color: #FFFFFF; border: none;")
+        sep.setStyleSheet("background-color: #333333; border: none;")
         sep.setFixedWidth(1)
 
         # 右:segmented + stacked

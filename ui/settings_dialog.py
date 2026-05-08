@@ -38,7 +38,7 @@ from core.config import (
     default_library_dir, default_playlists_dir,
 )
 from core.thumbnails import THUMB_DIR
-from ui.theme import BTN_QSS as _BTN_QSS
+from ui.theme import BTN_QSS as _BTN_QSS, PRIMARY_BTN_QSS as _PRIMARY_BTN_QSS
 
 
 _LOCKED_DEFAULT_QSS = (
@@ -86,6 +86,10 @@ class SettingsDialog(QDialog):
         )
         btns.accepted.connect(self.accept)
         btns.rejected.connect(self.reject)
+        # 把 OK / Cancel 做成跟右侧页"返回"按钮一致的红色主操作按钮形状
+        for b in btns.buttons():
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setStyleSheet(_PRIMARY_BTN_QSS)
         layout.addWidget(btns)
 
     # ------------------------------------------------------------------
