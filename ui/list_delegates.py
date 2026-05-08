@@ -78,7 +78,7 @@ class CoverRowDelegate(QStyledItemDelegate):
 
         # HR 徽章 (右侧固定位置, 占的位置无论是否显示都保留, 让其他歌曲对齐)
         is_hr = bool(index.data(ROLE_IS_HR))
-        badge_right = rect.right() - self.PAD
+        badge_right = rect.right() - 14
         badge_left = badge_right - _HR_BADGE_W
         if is_hr:
             badge_y = rect.top() + (self.THUMB_PX - _HR_BADGE_H) // 2
