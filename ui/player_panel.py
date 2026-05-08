@@ -62,9 +62,9 @@ class PlayerPanel(QWidget):
         self._shuffled: bool = False
         self._repeat: RepeatMode = RepeatMode.NONE
         self._refresh_mode_buttons()
-        # 三个滚动标签共享同一个计时器, 保证多行同步前进
+        # 三个滚动标签共享同一个计时器, 保证多行同步前进; 节奏比默认慢一点
         self._scroll_timer = QTimer(self)
-        self._scroll_timer.setInterval(30)
+        self._scroll_timer.setInterval(60)
         self._scroll_timer.timeout.connect(self._tick_scrolling_labels)
         self._scroll_timer.start()
 
@@ -112,24 +112,25 @@ class PlayerPanel(QWidget):
         self.progress.seek_requested.connect(self.seek_requested.emit)
         below.addWidget(self.progress)
 
-        below.addSpacerItem(QSpacerItem(0, 6))
+        below.addSpacerItem(QSpacerItem(0, 12))
 
-        # ---- 4. 歌曲信息 Song / Artist / Album ----
-        # 三个标签放进一个比面板更窄的居中容器, 任何一行超长就同步左右滚动。
+        # ---- 4. 歌曲信息 + 库按钮 + HR 徽章合并到同一行 ----
+        # 信息块 (歌名/歌手/专辑) 居中,左侧是库图标, 右侧是 HR 徽章。
+        # 这一整行就坐落在原 lib_row 的位置, 把空间利用起来, 视觉上整体下移。
         self.lbl_title = ScrollingLabel(self)
-        f = QFont(); f.setPointSize(20); f.setBold(True)
+        f = QFont(); f.setPointSize(28); f.setBold(True)
         self.lbl_title.setFont(f)
         self.lbl_title.setText("Song")
 
         self.lbl_artist = ScrollingLabel(self)
-        f_artist = QFont(); f_artist.setPointSize(14)
+        f_artist = QFont(); f_artist.setPointSize(20)
         self.lbl_artist.setFont(f_artist)
         self.lbl_artist.setText("Artist")
         self.lbl_artist.setCursor(Qt.CursorShape.PointingHandCursor)
         self.lbl_artist.double_clicked.connect(self.artist_double_clicked.emit)
 
         self.lbl_album = ScrollingLabel(self)
-        f_album = QFont(); f_album.setPointSize(12)
+        f_album = QFont(); f_album.setPointSize(17)
         self.lbl_album.setFont(f_album)
         self.lbl_album.setStyleSheet("color: #9E9E9E;")
         self.lbl_album.setText("Album")
@@ -139,32 +140,29 @@ class PlayerPanel(QWidget):
         self._info_container = QWidget(self)
         info_layout = QVBoxLayout(self._info_container)
         info_layout.setContentsMargins(0, 0, 0, 0)
-        info_layout.setSpacing(6)
+        info_layout.setSpacing(4)
         info_layout.addWidget(self.lbl_title)
         info_layout.addWidget(self.lbl_artist)
         info_layout.addWidget(self.lbl_album)
 
+        self.btn_library = IconButton("library", size=32)
+        self.btn_library.setToolTip("歌词")
+        self.btn_library.set_enabled_visual(False)
+        self.btn_library.clicked.connect(self.library_clicked.emit)
+
+        self.hr_badge = HRBadge(self)
+
         info_row = QHBoxLayout()
         info_row.setContentsMargins(0, 0, 0, 0)
+        info_row.setSpacing(0)
+        # 库按钮固定在最左, 与信息块底部对齐
+        info_row.addWidget(self.btn_library, 0, Qt.AlignmentFlag.AlignBottom)
         info_row.addStretch(1)
         info_row.addWidget(self._info_container, 0)
         info_row.addStretch(1)
+        # HR 徽章固定在最右, 与信息块底部对齐
+        info_row.addWidget(self.hr_badge, 0, Qt.AlignmentFlag.AlignBottom)
         below.addLayout(info_row)
-
-        below.addSpacerItem(QSpacerItem(0, 6))
-
-        # ---- 5. 库图标单独成行,左对齐;右侧放 HR 徽章 ----
-        lib_row = QHBoxLayout()
-        lib_row.setContentsMargins(0, 0, 0, 0)
-        self.btn_library = IconButton("library", size=32)
-        self.btn_library.setToolTip("歌词")
-        self.btn_library.set_enabled_visual(False)  # 还没加载歌曲,默认灰
-        self.btn_library.clicked.connect(self.library_clicked.emit)
-        lib_row.addWidget(self.btn_library)
-        lib_row.addStretch(1)
-        self.hr_badge = HRBadge(self)
-        lib_row.addWidget(self.hr_badge)
-        below.addLayout(lib_row)
 
         # ---- 6. 主控制行: shuffle 最左 | prev | PLAY | next | repeat 最右 ----
         ctrl_row = QHBoxLayout()

@@ -33,7 +33,7 @@ ROLE_IS_HR = Qt.ItemDataRole.UserRole + 4
 _HR_BADGE_W = 26
 _HR_BADGE_H = 16
 _HR_GOLD = QColor("#D4AF37")
-_SEPARATOR_COLOR = QColor("#2a2a2a")
+_SEPARATOR_COLOR = QColor("#3a3a3a")
 
 
 class CoverRowDelegate(QStyledItemDelegate):
@@ -41,7 +41,7 @@ class CoverRowDelegate(QStyledItemDelegate):
 
     THUMB_PX = 52
     PAD = 10
-    ROW_H = 53                     # 比封面多 1px,留给底部分隔线
+    ROW_H = 53                     # 封面 52 + 底部 1px 灰线 (行间唯一的"间隔")
     HR_RESERVED_W = _HR_BADGE_W + 12   # 右侧给 HR 徽章预留的横向空间
 
     def sizeHint(self, option: QStyleOptionViewItem, index) -> QSize:  # noqa: N802
@@ -89,7 +89,6 @@ class CoverRowDelegate(QStyledItemDelegate):
         text_x = thumb_rect.right() + self.PAD
         text_w = badge_left - self.PAD - text_x
         if text_w < 30:
-            self._paint_separator(painter, rect)
             painter.restore()
             return
 
@@ -137,16 +136,12 @@ class CoverRowDelegate(QStyledItemDelegate):
             elided_sub,
         )
 
-        # 底部 1px 灰色分隔线
-        self._paint_separator(painter, rect)
-
-        painter.restore()
-
-    @staticmethod
-    def _paint_separator(painter: QPainter, rect: QRect) -> None:
+        # 行底部 1px 灰线 (行间唯一的分隔, 上下封面紧贴)
         painter.setPen(_SEPARATOR_COLOR)
         y = rect.bottom()
         painter.drawLine(rect.left(), y, rect.right(), y)
+
+        painter.restore()
 
     @staticmethod
     def _paint_hr_badge(painter: QPainter, rect: QRect, base_font: QFont) -> None:
