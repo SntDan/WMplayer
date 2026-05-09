@@ -57,6 +57,8 @@ class PlayerPanel(QWidget):
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
+        # 缓存下方控件区的高度 sizeHint, 避免每次 resize 都重算 (拖动时每像素都触发)
+        self._cached_below_h: Optional[int] = None
         self._build_ui()
         self._is_playing = False
         self._shuffled: bool = False
@@ -313,22 +315,32 @@ class PlayerPanel(QWidget):
             封面宽 = 面板宽 - 2M
             封面高 = 面板高 - 2M - 下方控件高
         所以  面板宽 = 面板高 - 下方控件高
+
+        额外约束: 面板宽 ≤ 窗口宽 / 2, 保证右侧视图始终不窄于本面板。
+        这个上限同时也阻止了"最大化时面板膨胀到取消最大化时窗口缩不回去"的 bug。
         """
         h = self.height()
         if h <= 0:
             return
-        below_h = self._below.sizeHint().height()
+        # 下方控件区高度只取决于字体和固定按钮, 与窗口尺寸无关 → 缓存一次。
+        # 拖动窗口时每个像素都会触发 resize, 不缓存的话每次都会递归重算 sizeHint。
+        if self._cached_below_h is None:
+            self._cached_below_h = self._below.sizeHint().height()
+        below_h = self._cached_below_h
+
         # 面板理想宽 = 高 - 下方控件高(不含上下边距,边距已经在两侧对称分布)
         ideal_w = h - below_h
 
-        # 防挤压限制：如果主窗体被手动调窄，为了避免面板内容被截断或者右侧视图被挤消失，需强制退让。
+        # 上限: 不超过窗口宽度的一半, 这样右侧视图永远 ≥ 左侧。
+        # 主窗口的 setMinimumSize 把窗口宽下限设为 2*491+1=983, 即默认/最小态
+        # 下两侧正好等宽 (491px); 用户向右拖宽窗口时左侧保持自然宽度, 多出的
+        # 都给右侧; 用户拖大窗口高度时左侧才会增长 (始终 ≤ 窗口宽/2)。
         win = self.window()
         if win and win.width() > 0:
-            max_w = win.width() - 360
-            if max_w > 0:
-                ideal_w = min(ideal_w, max_w)
+            half_w = (win.width() - 1) // 2  # 减 1 给中间分隔线
+            ideal_w = min(ideal_w, half_w)
 
-        # 给个最小宽度防止极端窗口
+        # 极端最小, 兜底
         ideal_w = max(280, ideal_w)
         if self.maximumWidth() != ideal_w or self.minimumWidth() != ideal_w:
             self.setFixedWidth(ideal_w)

@@ -156,8 +156,10 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Music Player")
-        self.setMinimumSize(QSize(720, 760))
-        self.resize(QSize(920, 760))
+        # 默认 = 最小: 此尺寸下 left=right=491px (player_panel 在 h=760 下的自然宽度)。
+        # 不允许再缩, 防止右侧视图被挤窄于左侧封面。
+        self.setMinimumSize(QSize(983, 760))
+        self.resize(QSize(983, 760))
         self.setStyleSheet(GLOBAL_QSS)
 
         # ------- 数据模型 -------
@@ -310,16 +312,17 @@ class MainWindow(QMainWindow):
         _sc("Down", lambda: self._engine.set_volume(max(0, self._engine.get_volume() - 5)))
 
     def _on_player_width_locked(self, w: int) -> None:
-        # 右侧最小宽度 = 左侧, 但允许更宽 (用户向右拖右边界时, 右侧吃掉所有多余空间)。
-        # 同时把窗口的最小宽度锁成 (左 + 1px 分隔线 + 右), 不允许再缩。
-        # 只在当前窗口比这个最小值还窄时才主动放大,
-        # 用户已经拖大的尺寸保留, 避免拖动时窗口"反弹"乱闪。
-        self.right_panel.setMinimumWidth(w)
-        self.right_panel.setMaximumWidth(16777215)
-        target = w + 1 + w
-        self.setMinimumWidth(target)
-        if self.width() < target:
-            self.resize(target, self.height())
+        # 故意保持空实现。曾经在这里把窗口的 minimumWidth 跟 player_panel 一起涨,
+        # 并在 resizeEvent 链上 self.resize(...), 但带来两个 bug:
+        #   1) Aero Snap 到全屏后, 窗口高度变大 → 面板宽变大 → 窗口 minimumWidth 被
+        #      永久抬高, 取消最大化时无法回到保存的小尺寸 (出现"特别大/特别长")。
+        #   2) 在 Windows 交互式拖角(尤其是左上角)时, self.resize 与 WM 抢窗口几何,
+        #      表现成拖不跟手 / 卡住。
+        # 现在依靠 __init__ 里 setMinimumSize(720,760) 提供静态下限, 以及 Qt 布局系统
+        # 根据子控件 (player_panel.setFixedWidth + 右侧 sizePolicy) 自动算出的自然
+        # 下限。player_panel 在自身 resizeEvent 里会随窗口高度自动重新计算并收缩,
+        # 因此窗口缩小时也会跟着缩, 形成稳定的多步收敛。
+        return
 
     def _on_player_artist_double_clicked(self) -> None:
         track = self._playlist.current
