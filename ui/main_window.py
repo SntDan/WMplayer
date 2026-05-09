@@ -22,6 +22,7 @@ from PyQt6.QtCore import (
     QRunnable,
     Qt,
     QThreadPool,
+    QTimer,
     pyqtSignal,
 )
 from PyQt6.QtGui import QKeySequence, QShortcut
@@ -161,6 +162,18 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(QSize(983, 760))
         self.resize(QSize(983, 760))
         self.setStyleSheet(GLOBAL_QSS)
+
+        # 跨屏(尤其是不同 DPI 屏)拖动还原: Qt 默认在 DPI 变化时按"物理像素守恒"
+        # 重设窗口几何, 导致 logical (DIP) 尺寸跟着变 -- 用户从"最小"状态拖过去
+        # 窗口就放大了。用一个 debounced 计时器记录用户"稳定"过的尺寸 (resize
+        # 停下 120ms 之后才提交), 跨屏时还原到这个尺寸。screenChanged 信号要等
+        # windowHandle() 真正存在 (即首次 show 之后) 才能接, 所以放在 showEvent 里。
+        self._stable_size: QSize = QSize(983, 760)
+        self._stable_timer = QTimer(self)
+        self._stable_timer.setSingleShot(True)
+        self._stable_timer.setInterval(120)
+        self._stable_timer.timeout.connect(self._capture_stable_size)
+        self._screen_sig_wired = False
 
         # ------- 数据模型 -------
         self._config = Config()
@@ -397,6 +410,50 @@ class MainWindow(QMainWindow):
         super().resizeEvent(e)
         if hasattr(self, "player_panel"):
             self.player_panel._lock_width_to_height()
+        # 防抖采集: 用户停止 resize 120ms 后才会真正写入 _stable_size。这样跨屏
+        # 时 Qt 自身那一两次自动 resize 不会污染我们记下的"用户期望尺寸"。
+        if not self.isMaximized() and not self.isFullScreen():
+            self._stable_timer.start()
+
+    def showEvent(self, e):  # noqa: N802
+        super().showEvent(e)
+        # windowHandle() 在首次 show 之后才有, 所以这里挂 screenChanged 监听。
+        wh = self.windowHandle()
+        if wh is not None and not self._screen_sig_wired:
+            wh.screenChanged.connect(self._on_screen_changed)
+            self._screen_sig_wired = True
+
+    def _capture_stable_size(self) -> None:
+        if not self.isMaximized() and not self.isFullScreen():
+            self._stable_size = self.size()
+
+    def _on_screen_changed(self, _screen) -> None:
+        """跨屏时强制让面板布局缓存失效 + 把窗口还原到用户最近稳定的尺寸。
+
+        Qt 在 DPI 切换时会按物理像素守恒重设几何, 进入新屏后:
+          - 字体度量可能变 -> player_panel 的 below_h 缓存失效
+          - logical 尺寸被改 -> 用户原本"在最小"的窗口就不再是最小了
+        这里都修掉。
+        """
+        pp = getattr(self, "player_panel", None)
+        if pp is not None:
+            pp._cached_below_h = None
+        # 让 Qt 把它自己的 DPI-resize 跑完, 再下一帧把尺寸还原回稳定值。
+        # 期间不要让 _stable_timer 把这些瞬态尺寸当成"用户期望"记下来。
+        self._stable_timer.stop()
+        QTimer.singleShot(0, self._restore_stable_size)
+
+    def _restore_stable_size(self) -> None:
+        pp = getattr(self, "player_panel", None)
+        if pp is not None:
+            pp._lock_width_to_height()
+        target = self._stable_size
+        target_w = max(target.width(), self.minimumWidth())
+        target_h = max(target.height(), self.minimumHeight())
+        if self.size().width() != target_w or self.size().height() != target_h:
+            self.resize(target_w, target_h)
+        # 还原完成 -- 重启 debounce, 把"还原后的尺寸"作为新的稳定基线。
+        self._stable_timer.start()
 
     def closeEvent(self, e):  # noqa: N802
         if not self._config.factory_reset_pending:
