@@ -116,14 +116,19 @@ class PlayerPanel(QWidget):
         labels_row.addWidget(self.lbl_pos, 1)
         labels_row.addWidget(self.lbl_index, 1)
         labels_row.addWidget(self.lbl_dur, 1)
-        below.addLayout(labels_row)
 
         # ---- 3. 进度条 ----
         self.progress = ProgressBar(self)
         self.progress.seek_requested.connect(self.seek_requested.emit)
-        below.addWidget(self.progress)
 
-        below.addSpacerItem(QSpacerItem(0, PLAYER_INFO_TOP_GAP))
+        time_progress_group = QVBoxLayout()
+        time_progress_group.setContentsMargins(0, 0, 0, 0)
+        time_progress_group.setSpacing(2)
+        time_progress_group.addLayout(labels_row)
+        time_progress_group.addWidget(self.progress)
+        below.addLayout(time_progress_group)
+
+        below.addSpacerItem(QSpacerItem(0, PLAYER_INFO_TOP_GAP + 6))
 
         # ---- 4. 歌曲信息 + 库按钮 + HR 徽章合并到同一行 ----
         # 信息块 (歌名/歌手/专辑) 居中,左侧是库图标, 右侧是 HR 徽章。
