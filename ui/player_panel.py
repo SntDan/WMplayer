@@ -387,10 +387,10 @@ class PlayerPanel(QWidget):
             self.setFixedWidth(ideal_w)
             self.width_locked.emit(ideal_w)
 
-        # 信息区(歌名/歌手/专辑)宽度: 面板的 ~62%, 留出左右空白
+        # 信息区(歌名/歌手/专辑)宽度: 面板的 ~72%, 留出左右空白
         info = getattr(self, "_info_container", None)
         if info is not None:
-            info_w = max(200, min(380, int(ideal_w * 0.62)))
+            info_w = max(240, min(420, int(ideal_w * 0.72)))
             if info.maximumWidth() != info_w or info.minimumWidth() != info_w:
                 info.setFixedWidth(info_w)
 
