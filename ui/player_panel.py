@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QHBoxLayout,
@@ -46,7 +46,10 @@ PLAYER_INFO_ARTIST_PX = 17
 PLAYER_INFO_ALBUM_PX = 14
 PLAYER_INFO_LINE_SPACING = 5
 PLAYER_INFO_BOTTOM_GAP = 4
-PLAYER_LIBRARY_ICON_Y_OFFSET = 7
+PLAYER_TIME_POINT_SIZE = 12
+PLAYER_TIME_ROW_HEIGHT = 15
+PLAYER_LIBRARY_BUTTON_HEIGHT = 46
+PLAYER_LIBRARY_ICON_Y_OFFSET = 10
 
 
 class PlayerPanel(QWidget):
@@ -107,10 +110,11 @@ class PlayerPanel(QWidget):
         self.lbl_pos = QLabel("00:00", self)
         self.lbl_index = QLabel("0/0", self)
         self.lbl_dur = QLabel("00:00", self)
-        f = QFont(); f.setPointSize(11)
+        f = QFont(); f.setPointSize(PLAYER_TIME_POINT_SIZE)
         for lbl in (self.lbl_pos, self.lbl_index, self.lbl_dur):
             lbl.setFont(f)
-            lbl.setStyleSheet("color: #FFFFFF;")
+            lbl.setFixedHeight(PLAYER_TIME_ROW_HEIGHT)
+            lbl.setStyleSheet("color: #FFFFFF; padding-bottom: 5px;")
         self.lbl_pos.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.lbl_index.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_dur.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -129,7 +133,7 @@ class PlayerPanel(QWidget):
         time_progress_group.addWidget(self.progress)
         below.addLayout(time_progress_group)
 
-        below.addSpacerItem(QSpacerItem(0, PLAYER_INFO_TOP_GAP + 10))
+        below.addSpacerItem(QSpacerItem(0, PLAYER_INFO_TOP_GAP + 8))
 
         # ---- 4. 歌曲信息 + 库按钮 + HR 徽章合并到同一行 ----
         # 信息块 (歌名/歌手/专辑) 居中,左侧是库图标, 右侧是 HR 徽章。
@@ -160,6 +164,7 @@ class PlayerPanel(QWidget):
         info_layout.addWidget(self.lbl_album)
 
         self.btn_library = IconButton("library", size=32)
+        self.btn_library.setFixedSize(QSize(32, PLAYER_LIBRARY_BUTTON_HEIGHT))
         self.btn_library.setToolTip("歌词")
         self.btn_library.set_enabled_visual(False)
         self.btn_library.set_icon_y_offset(PLAYER_LIBRARY_ICON_Y_OFFSET)
@@ -178,7 +183,7 @@ class PlayerPanel(QWidget):
         # HR 徽章固定在最右, 与信息块底部对齐
         info_row.addWidget(self.hr_badge, 0, Qt.AlignmentFlag.AlignBottom)
         below.addLayout(info_row)
-        below.addSpacerItem(QSpacerItem(0, PLAYER_INFO_BOTTOM_GAP + 2))
+        below.addSpacerItem(QSpacerItem(0, PLAYER_INFO_BOTTOM_GAP + 4))
 
         # ---- 6. 主控制行: shuffle 最左 | prev | PLAY | next | repeat 最右 ----
         ctrl_row = QHBoxLayout()
