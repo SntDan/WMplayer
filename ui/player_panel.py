@@ -41,10 +41,10 @@ def _format_ms(ms: int) -> str:
 
 PLAYER_INFO_TOP_GAP = 4
 PLAYER_INFO_HEIGHT = 69
-PLAYER_INFO_TITLE_PX = 22
+PLAYER_INFO_TITLE_PX = 20
 PLAYER_INFO_ARTIST_PX = 17
-PLAYER_INFO_ALBUM_PX = 14
-PLAYER_INFO_LINE_SPACING = 5
+PLAYER_INFO_ALBUM_PX = 17
+PLAYER_INFO_LINE_SPACING = 7
 PLAYER_INFO_BOTTOM_GAP = 4
 PLAYER_TIME_POINT_SIZE = 12
 PLAYER_TIME_ROW_HEIGHT = 15
@@ -343,12 +343,10 @@ class PlayerPanel(QWidget):
     def resizeEvent(self, e):  # noqa: N802
         super().resizeEvent(e)
         self._lock_width_to_height()
-        self._position_library_button()
 
     def showEvent(self, e):  # noqa: N802
         super().showEvent(e)
         self._lock_width_to_height()
-        self._position_library_button()
 
     def _lock_width_to_height(self) -> None:
         """根据当前高度反推面板理想宽度,使封面四边到面板边距相等。
