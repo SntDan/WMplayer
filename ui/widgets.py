@@ -333,7 +333,7 @@ class AlbumCover(QWidget):
         base_side = min(rect.width(), rect.height())
         side = int(base_side * 0.97)
         x = (rect.width() - side) // 2
-        y = (rect.height() - side) // 2
+        y = x if rect.height() >= rect.width() else (rect.height() - side) // 2
         target = QRectF(x, y, side, side)
         # 封面或占位
         if self._pixmap and not self._pixmap.isNull():
