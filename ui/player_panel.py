@@ -48,6 +48,8 @@ PLAYER_INFO_LINE_SPACING = 5
 PLAYER_INFO_BOTTOM_GAP = 4
 PLAYER_TIME_POINT_SIZE = 12
 PLAYER_TIME_ROW_HEIGHT = 15
+PLAYER_TIME_PAINT_HEIGHT = 24
+PLAYER_TIME_TEXT_Y_OFFSET = -3
 PLAYER_LIBRARY_BUTTON_HEIGHT = 46
 PLAYER_LIBRARY_ICON_Y_OFFSET = 10
 
@@ -106,14 +108,19 @@ class PlayerPanel(QWidget):
 
         # ---- 2. 时间标签行: 与封面左/中/右对齐 ----
         labels_row = QHBoxLayout()
-        labels_row.setContentsMargins(0, 0, 0, 0)
+        labels_row.setContentsMargins(
+            0,
+            0,
+            0,
+            PLAYER_TIME_ROW_HEIGHT - PLAYER_TIME_PAINT_HEIGHT,
+        )
         self.lbl_pos = QLabel("00:00", self)
         self.lbl_index = QLabel("0/0", self)
         self.lbl_dur = QLabel("00:00", self)
         f = QFont(); f.setPointSize(PLAYER_TIME_POINT_SIZE)
         for lbl in (self.lbl_pos, self.lbl_index, self.lbl_dur):
             lbl.setFont(f)
-            lbl.setFixedHeight(PLAYER_TIME_ROW_HEIGHT)
+            lbl.setFixedHeight(PLAYER_TIME_PAINT_HEIGHT)
             lbl.setStyleSheet("color: #FFFFFF; padding-bottom: 5px;")
         self.lbl_pos.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.lbl_index.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -336,10 +343,12 @@ class PlayerPanel(QWidget):
     def resizeEvent(self, e):  # noqa: N802
         super().resizeEvent(e)
         self._lock_width_to_height()
+        self._position_library_button()
 
     def showEvent(self, e):  # noqa: N802
         super().showEvent(e)
         self._lock_width_to_height()
+        self._position_library_button()
 
     def _lock_width_to_height(self) -> None:
         """根据当前高度反推面板理想宽度,使封面四边到面板边距相等。
