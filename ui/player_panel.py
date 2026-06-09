@@ -52,6 +52,7 @@ PLAYER_TIME_PAINT_HEIGHT = 24
 PLAYER_TIME_TEXT_Y_OFFSET = -3
 PLAYER_LIBRARY_BUTTON_HEIGHT = 46
 PLAYER_LIBRARY_ICON_Y_OFFSET = 14
+PLAYER_HR_Y_OFFSET = 2
 
 
 class PlayerPanel(QWidget):
@@ -179,6 +180,15 @@ class PlayerPanel(QWidget):
 
         self.hr_badge = HRBadge(self)
 
+        # HR 徽章外面包一层固定高度容器, 方便按像素上移。
+        self._hr_badge_box = QWidget(self)
+        self._hr_badge_box.setFixedHeight(PLAYER_INFO_HEIGHT)
+        hr_layout = QVBoxLayout(self._hr_badge_box)
+        hr_layout.setContentsMargins(0, 0, 0, PLAYER_HR_Y_OFFSET)
+        hr_layout.setSpacing(0)
+        hr_layout.addStretch(1)
+        hr_layout.addWidget(self.hr_badge, 0, Qt.AlignmentFlag.AlignHCenter)
+
         info_row = QHBoxLayout()
         info_row.setContentsMargins(0, 0, 0, 0)
         info_row.setSpacing(0)
@@ -187,8 +197,8 @@ class PlayerPanel(QWidget):
         info_row.addStretch(1)
         info_row.addWidget(self._info_container, 0)
         info_row.addStretch(1)
-        # HR 徽章固定在最右, 与信息块底部对齐
-        info_row.addWidget(self.hr_badge, 0, Qt.AlignmentFlag.AlignBottom)
+        # HR 徽章固定在最右, 通过 PLAYER_HR_Y_OFFSET 按像素上移
+        info_row.addWidget(self._hr_badge_box, 0)
         below.addLayout(info_row)
         below.addSpacerItem(QSpacerItem(0, PLAYER_INFO_BOTTOM_GAP + 4))
 
@@ -387,10 +397,10 @@ class PlayerPanel(QWidget):
             self.setFixedWidth(ideal_w)
             self.width_locked.emit(ideal_w)
 
-        # 信息区(歌名/歌手/专辑)宽度: 面板的 ~72%, 留出左右空白
+        # 信息区(歌名/歌手/专辑)宽度: 面板的 ~70%, 留出左右空白
         info = getattr(self, "_info_container", None)
         if info is not None:
-            info_w = max(240, min(420, int(ideal_w * 0.72)))
+            info_w = max(240, min(420, int(ideal_w * 0.70)))
             if info.maximumWidth() != info_w or info.minimumWidth() != info_w:
                 info.setFixedWidth(info_w)
 
