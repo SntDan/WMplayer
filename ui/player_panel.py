@@ -44,8 +44,9 @@ PLAYER_INFO_HEIGHT = 69
 PLAYER_INFO_TITLE_PX = 22
 PLAYER_INFO_ARTIST_PX = 17
 PLAYER_INFO_ALBUM_PX = 14
-PLAYER_INFO_LINE_SPACING = 3
+PLAYER_INFO_LINE_SPACING = 5
 PLAYER_INFO_BOTTOM_GAP = 4
+PLAYER_LIBRARY_ICON_Y_OFFSET = 7
 
 
 class PlayerPanel(QWidget):
@@ -102,7 +103,7 @@ class PlayerPanel(QWidget):
 
         # ---- 2. 时间标签行: 与封面左/中/右对齐 ----
         labels_row = QHBoxLayout()
-        labels_row.setContentsMargins(0, 4, 0, 0)
+        labels_row.setContentsMargins(0, 0, 0, 0)
         self.lbl_pos = QLabel("00:00", self)
         self.lbl_index = QLabel("0/0", self)
         self.lbl_dur = QLabel("00:00", self)
@@ -123,12 +124,12 @@ class PlayerPanel(QWidget):
 
         time_progress_group = QVBoxLayout()
         time_progress_group.setContentsMargins(0, 0, 0, 0)
-        time_progress_group.setSpacing(2)
+        time_progress_group.setSpacing(0)
         time_progress_group.addLayout(labels_row)
         time_progress_group.addWidget(self.progress)
         below.addLayout(time_progress_group)
 
-        below.addSpacerItem(QSpacerItem(0, PLAYER_INFO_TOP_GAP + 6))
+        below.addSpacerItem(QSpacerItem(0, PLAYER_INFO_TOP_GAP + 10))
 
         # ---- 4. 歌曲信息 + 库按钮 + HR 徽章合并到同一行 ----
         # 信息块 (歌名/歌手/专辑) 居中,左侧是库图标, 右侧是 HR 徽章。
@@ -161,6 +162,7 @@ class PlayerPanel(QWidget):
         self.btn_library = IconButton("library", size=32)
         self.btn_library.setToolTip("歌词")
         self.btn_library.set_enabled_visual(False)
+        self.btn_library.set_icon_y_offset(PLAYER_LIBRARY_ICON_Y_OFFSET)
         self.btn_library.clicked.connect(self.library_clicked.emit)
 
         self.hr_badge = HRBadge(self)
@@ -176,7 +178,7 @@ class PlayerPanel(QWidget):
         # HR 徽章固定在最右, 与信息块底部对齐
         info_row.addWidget(self.hr_badge, 0, Qt.AlignmentFlag.AlignBottom)
         below.addLayout(info_row)
-        below.addSpacerItem(QSpacerItem(0, PLAYER_INFO_BOTTOM_GAP))
+        below.addSpacerItem(QSpacerItem(0, PLAYER_INFO_BOTTOM_GAP + 2))
 
         # ---- 6. 主控制行: shuffle 最左 | prev | PLAY | next | repeat 最右 ----
         ctrl_row = QHBoxLayout()

@@ -207,6 +207,7 @@ class IconButton(QPushButton):
         self._active = active
         self._enabled_visual = True
         self._size = size
+        self._icon_y_offset = 0
         self.setFixedSize(QSize(size, size))
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
@@ -227,6 +228,12 @@ class IconButton(QPushButton):
             self._enabled_visual = enabled
             self.update()
 
+    def set_icon_y_offset(self, offset: int) -> None:
+        """只移动图标绘制位置,不改变按钮本身的布局/点击区域。"""
+        if self._icon_y_offset != offset:
+            self._icon_y_offset = offset
+            self.update()
+
     def paintEvent(self, _e) -> None:
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -244,6 +251,8 @@ class IconButton(QPushButton):
             col = self._color
         inset = max(2.0, self.width() * 0.10)
         icon_rect = rect.adjusted(inset, inset, -inset, -inset)
+        if self._icon_y_offset:
+            icon_rect.translate(0, self._icon_y_offset)
         path = LUCIDE_STROKE.get(self._icon_name)
         if path:
             _draw_lucide_stroke(p, icon_rect, path, col, stroke_ratio=2.2 / 24.0)
