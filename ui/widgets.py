@@ -369,7 +369,7 @@ class ProgressBar(QWidget):
 
     seek_requested = pyqtSignal(int)  # 用户拖到的毫秒位置
 
-    _DOT_R = 6           # 圆点半径
+    _DOT_R = 5           # 圆点半径
     _PAD = 7             # 两侧内边距(略大于半径,防止抗锯齿被裁)
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
@@ -377,8 +377,8 @@ class ProgressBar(QWidget):
         self._position = 0
         self._duration = 0
         self._dragging = False
-        # 高度需要 ≥ 圆点直径,留点余量
-        self.setFixedHeight(self._DOT_R * 2 + 6)
+        # 高度贴近可见圆点,避免进度条用隐形高度撑开播放器布局。
+        self.setFixedHeight(self._DOT_R * 2 + 2)
         self.setMouseTracking(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 

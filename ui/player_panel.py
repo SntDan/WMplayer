@@ -39,6 +39,15 @@ def _format_ms(ms: int) -> str:
     return f"{s // 60:02d}:{s % 60:02d}"
 
 
+PLAYER_INFO_TOP_GAP = 4
+PLAYER_INFO_HEIGHT = 69
+PLAYER_INFO_TITLE_PX = 22
+PLAYER_INFO_ARTIST_PX = 17
+PLAYER_INFO_ALBUM_PX = 14
+PLAYER_INFO_LINE_SPACING = 2
+PLAYER_INFO_BOTTOM_GAP = 4
+
+
 class PlayerPanel(QWidget):
     # 与外部交互的信号
     play_pause_clicked = pyqtSignal()
@@ -114,35 +123,32 @@ class PlayerPanel(QWidget):
         self.progress.seek_requested.connect(self.seek_requested.emit)
         below.addWidget(self.progress)
 
-        below.addSpacerItem(QSpacerItem(0, 12))
+        below.addSpacerItem(QSpacerItem(0, PLAYER_INFO_TOP_GAP))
 
         # ---- 4. 歌曲信息 + 库按钮 + HR 徽章合并到同一行 ----
         # 信息块 (歌名/歌手/专辑) 居中,左侧是库图标, 右侧是 HR 徽章。
         # 这一整行就坐落在原 lib_row 的位置, 把空间利用起来, 视觉上整体下移。
         self.lbl_title = ScrollingLabel(self)
-        f = QFont(); f.setPointSize(28); f.setBold(True)
-        self.lbl_title.setFont(f)
+        self._set_info_label_font(self.lbl_title, PLAYER_INFO_TITLE_PX, bold=True)
         self.lbl_title.setText("Song")
 
         self.lbl_artist = ScrollingLabel(self)
-        f_artist = QFont(); f_artist.setPointSize(20)
-        self.lbl_artist.setFont(f_artist)
+        self._set_info_label_font(self.lbl_artist, PLAYER_INFO_ARTIST_PX)
         self.lbl_artist.setText("Artist")
         self.lbl_artist.setCursor(Qt.CursorShape.PointingHandCursor)
         self.lbl_artist.double_clicked.connect(self.artist_double_clicked.emit)
 
         self.lbl_album = ScrollingLabel(self)
-        f_album = QFont(); f_album.setPointSize(17)
-        self.lbl_album.setFont(f_album)
-        self.lbl_album.setStyleSheet("color: #9E9E9E;")
+        self._set_info_label_font(self.lbl_album, PLAYER_INFO_ALBUM_PX, color="#9E9E9E")
         self.lbl_album.setText("Album")
         self.lbl_album.setCursor(Qt.CursorShape.PointingHandCursor)
         self.lbl_album.double_clicked.connect(self.album_double_clicked.emit)
 
         self._info_container = QWidget(self)
+        self._info_container.setFixedHeight(PLAYER_INFO_HEIGHT)
         info_layout = QVBoxLayout(self._info_container)
         info_layout.setContentsMargins(0, 0, 0, 0)
-        info_layout.setSpacing(4)
+        info_layout.setSpacing(PLAYER_INFO_LINE_SPACING)
         info_layout.addWidget(self.lbl_title)
         info_layout.addWidget(self.lbl_artist)
         info_layout.addWidget(self.lbl_album)
@@ -165,6 +171,7 @@ class PlayerPanel(QWidget):
         # HR 徽章固定在最右, 与信息块底部对齐
         info_row.addWidget(self.hr_badge, 0, Qt.AlignmentFlag.AlignBottom)
         below.addLayout(info_row)
+        below.addSpacerItem(QSpacerItem(0, PLAYER_INFO_BOTTOM_GAP))
 
         # ---- 6. 主控制行: shuffle 最左 | prev | PLAY | next | repeat 最右 ----
         ctrl_row = QHBoxLayout()
@@ -222,6 +229,21 @@ class PlayerPanel(QWidget):
         bottom_row.addStretch(1)
         bottom_row.addWidget(self.btn_settings, 0, Qt.AlignmentFlag.AlignRight)
         below.addLayout(bottom_row)
+
+    def _set_info_label_font(
+        self,
+        label: ScrollingLabel,
+        pixel_size: int,
+        *,
+        bold: bool = False,
+        color: str = "#FFFFFF",
+    ) -> None:
+        font = QFont()
+        font.setPixelSize(pixel_size)
+        font.setBold(bold)
+        label.setFont(font)
+        weight = "700" if bold else "400"
+        label.setStyleSheet(f"color: {color}; font-size: {pixel_size}px; font-weight: {weight};")
 
     # ------------------------------------------------------------------
     # 公开方法 - 由 MainWindow 调用更新视图
