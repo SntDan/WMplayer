@@ -477,6 +477,7 @@ class ScrollingLabel(QLabel):
         super().__init__(parent)
         self._offset = 0
         self._direction = 1
+        self._pause_ticks = 0
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         # 水平方向 Ignored: 无论文字多长都不会向父布局请求更多宽度
         sp = QSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
@@ -493,6 +494,7 @@ class ScrollingLabel(QLabel):
         super().setText(text)
         self._offset = 0
         self._direction = 1
+        self._pause_ticks = 0
         self.update()
 
     def needs_scroll(self) -> bool:
@@ -503,16 +505,25 @@ class ScrollingLabel(QLabel):
         """由外部统一计时器驱动一格滚动。"""
         if not self.needs_scroll() or not self.isVisible():
             return
+        if self._pause_ticks > 0:
+            self._pause_ticks -= 1
+            return
+
         self._offset += self._direction
         fm = self.fontMetrics()
         max_off = fm.horizontalAdvance(self.text()) - self.width() + 20
         if max_off <= 0:
             self._offset = 0
             self._direction = 1
+            self._pause_ticks = 8
         elif self._offset >= max_off:
+            self._offset = max_off
             self._direction = -1
+            self._pause_ticks = 8
         elif self._offset <= 0:
+            self._offset = 0
             self._direction = 1
+            self._pause_ticks = 8
         self.update()
 
     def mouseDoubleClickEvent(self, e):  # noqa: N802

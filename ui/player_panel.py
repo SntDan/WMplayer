@@ -41,9 +41,9 @@ def _format_ms(ms: int) -> str:
 
 PLAYER_INFO_TOP_GAP = 0
 PLAYER_INFO_HEIGHT = 85
-PLAYER_INFO_TITLE_PX = 20
+PLAYER_INFO_TITLE_PX = 21
 PLAYER_INFO_ARTIST_PX = 17
-PLAYER_INFO_ALBUM_PX = 17
+PLAYER_INFO_ALBUM_PX = 16
 PLAYER_INFO_LINE_SPACING = 3
 PLAYER_INFO_BOTTOM_GAP = 0
 PLAYER_TIME_POINT_SIZE = 12
@@ -51,7 +51,7 @@ PLAYER_TIME_ROW_HEIGHT = 15
 PLAYER_TIME_PAINT_HEIGHT = 24
 PLAYER_TIME_TEXT_Y_OFFSET = -3
 PLAYER_LIBRARY_BUTTON_HEIGHT = 46
-PLAYER_LIBRARY_ICON_Y_OFFSET = 10
+PLAYER_LIBRARY_ICON_Y_OFFSET = 15
 
 
 class PlayerPanel(QWidget):
@@ -387,10 +387,10 @@ class PlayerPanel(QWidget):
             self.setFixedWidth(ideal_w)
             self.width_locked.emit(ideal_w)
 
-        # 信息区(歌名/歌手/专辑)宽度: 面板的 ~62%, 留出左右空白
+        # 信息区(歌名/歌手/专辑)宽度: 面板的 ~75%, 留出左右空白
         info = getattr(self, "_info_container", None)
         if info is not None:
-            info_w = max(200, min(380, int(ideal_w * 0.62)))
+            info_w = max(240, min(420, int(ideal_w * 0.75)))
             if info.maximumWidth() != info_w or info.minimumWidth() != info_w:
                 info.setFixedWidth(info_w)
 
