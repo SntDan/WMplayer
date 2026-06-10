@@ -4,7 +4,6 @@
 显示 playlists/ 目录下所有 .m3u8 歌单。
 - 双击 → 加载到播放队列(并播放第一首)
 - 右键: 重命名 / 删除
-- 顶部"新建空歌单"按钮
 """
 
 from __future__ import annotations
@@ -21,19 +20,18 @@ from PyQt6.QtWidgets import (
     QListWidgetItem,
     QMenu,
     QMessageBox,
-    QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
 from core.playlist_store import PlaylistStore
-from ui.theme import BTN_QSS as _BTN_QSS
+from core.thumbnails import thumb_path_for
+from ui.list_delegates import CoverRowDelegate, ROLE_SUBTITLE, ROLE_THUMB_PATHS
 
 
 class PlaylistsPanel(QWidget):
 
     open_playlist = pyqtSignal(str)         # 双击某个歌单 → 加载并播放
-    new_empty_playlist = pyqtSignal(str)    # 新建空歌单
     rename_playlist = pyqtSignal(str, str)  # (old, new)
     delete_playlist = pyqtSignal(str)
 
@@ -66,28 +64,20 @@ class PlaylistsPanel(QWidget):
         self.path_label.setWordWrap(True)
         outer.addWidget(self.path_label)
 
-        # 操作行
-        action_row = QHBoxLayout()
-        action_row.setSpacing(6)
-        self.btn_new = QPushButton("+ 新建空歌单")
-        self.btn_new.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_new.setStyleSheet(_BTN_QSS)
-        action_row.addWidget(self.btn_new)
-        action_row.addStretch(1)
-        outer.addLayout(action_row)
-
         # 列表
         self.list = QListWidget()
         self.list.setTextElideMode(Qt.TextElideMode.ElideRight)
         self.list.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
         self.list.setUniformItemSizes(True)
         self.list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.list.setMouseTracking(True)
         self.list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._row_delegate = CoverRowDelegate(self.list)
+        self.list.setItemDelegate(self._row_delegate)
         outer.addWidget(self.list, 1)
 
     def _wire(self) -> None:
         self._store.changed.connect(self.refresh)
-        self.btn_new.clicked.connect(self._on_new)
         self.list.itemDoubleClicked.connect(self._on_double_click)
         self.list.customContextMenuRequested.connect(self._on_context_menu)
 
@@ -96,15 +86,13 @@ class PlaylistsPanel(QWidget):
         self.list.clear()
         names = self._store.list_names()
         for name in names:
+            paths = self._store.load(name)
             it = QListWidgetItem(name)
             it.setData(Qt.ItemDataRole.UserRole, name)
+            it.setData(ROLE_SUBTITLE, f"{len(paths)} 首")
+            it.setData(ROLE_THUMB_PATHS, [thumb_path_for(p) for p in paths[:4]])
             self.list.addItem(it)
         self.count_label.setText(f"{len(names)} 个")
-
-    def _on_new(self) -> None:
-        name, ok = QInputDialog.getText(self, "新建空歌单", "歌单名称:")
-        if ok and name.strip():
-            self.new_empty_playlist.emit(name.strip())
 
     def _on_double_click(self, item: QListWidgetItem) -> None:
         name = item.data(Qt.ItemDataRole.UserRole)

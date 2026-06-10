@@ -12,6 +12,7 @@ from ui.list_delegates import CoverRowDelegate, ROLE_SUBTITLE, ROLE_THUMB_PATH
 
 class ArtistsPanel(QWidget):
     play_paths_now = pyqtSignal(list, int)
+    play_paths_sequential = pyqtSignal(list, int)
     enqueue_paths = pyqtSignal(list)
     add_paths_to_playlist = pyqtSignal(list)
 
@@ -63,6 +64,7 @@ class ArtistsPanel(QWidget):
         from .albums_panel import AlbumsPanel
         self.albums_subpanel = AlbumsPanel(library=self._library, embedded=True)
         self.albums_subpanel.play_paths_now.connect(self.play_paths_now.emit)
+        self.albums_subpanel.play_paths_sequential.connect(self.play_paths_sequential.emit)
         self.albums_subpanel.enqueue_paths.connect(self.enqueue_paths.emit)
         self.albums_subpanel.add_paths_to_playlist.connect(self.add_paths_to_playlist.emit)
         self.albums_subpanel.back_to_artists_requested.connect(lambda: self.stack.setCurrentIndex(0))

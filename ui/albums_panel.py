@@ -36,6 +36,7 @@ class ElidedLabel(QLabel):
 
 class AlbumsPanel(QWidget):
     play_paths_now = pyqtSignal(list, int)
+    play_paths_sequential = pyqtSignal(list, int)
     enqueue_paths = pyqtSignal(list)
     add_paths_to_playlist = pyqtSignal(list)
     back_to_artists_requested = pyqtSignal()
@@ -193,7 +194,7 @@ class AlbumsPanel(QWidget):
         h_back.addWidget(self.btn_back)
         h_back.addStretch()
         
-        self.btn_play_all = QPushButton("播放全部")
+        self.btn_play_all = QPushButton("顺序播放")
         self.btn_play_all.setStyleSheet(PRIMARY_BTN_QSS)
         self.btn_play_all.setCursor(Qt.CursorShape.PointingHandCursor)
         h_back.addWidget(self.btn_play_all)
@@ -331,30 +332,21 @@ class AlbumsPanel(QWidget):
             track_idx = next(i for i, t in enumerate(tracks) if t.path == path)
         except StopIteration:
             track_idx = 0
-        self._play_from_album(album, track_idx)
+        self._play_from_album(album, track_idx, sequential=True)
 
     def _on_play_all(self) -> None:
         album = getattr(self, "_current_album", "")
         if album in self._albums_tracks:
-            self._play_from_album(album, 0)
+            self._play_from_album(album, 0, sequential=True)
 
-    def _play_from_album(self, album: str, track_index: int) -> None:
-        """从指定专辑的某曲播起,后续按当前列表顺序自动续播下一张专辑直到结尾。
-
-        - 通用专辑视图:续播全曲库内按字母序的下一张专辑
-        - 艺术家筛选视图:仅续播该歌手的下一张专辑(因为 _albums_tracks 已被
-          set_artist_filter 过滤过)
-        """
-        albums = sorted(self._albums_tracks.keys())
-        if album not in albums:
+    def _play_from_album(self, album: str, track_index: int, *, sequential: bool = False) -> None:
+        """从当前专辑内播起;队列范围始终限制在这张专辑内。"""
+        tracks = self._albums_tracks.get(album, [])
+        if not tracks:
             return
-        start_album_pos = albums.index(album)
-        paths: List[str] = []
-        play_idx = 0
-        for i in range(start_album_pos, len(albums)):
-            album_tracks = self._albums_tracks[albums[i]]
-            if i == start_album_pos:
-                play_idx = len(paths) + max(0, min(track_index, len(album_tracks) - 1))
-            paths.extend(t.path for t in album_tracks)
-        if paths:
+        paths = [t.path for t in tracks]
+        play_idx = max(0, min(track_index, len(paths) - 1))
+        if sequential:
+            self.play_paths_sequential.emit(paths, play_idx)
+        else:
             self.play_paths_now.emit(paths, play_idx)

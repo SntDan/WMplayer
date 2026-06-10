@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
+from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError
 from typing import Optional
 
 import vlc
@@ -31,7 +33,7 @@ class AudioEngine(QObject):
         "--no-video",                # 不输出视频(已涵盖 video-title 等子选项)
         "--quiet",                   # 静默日志
         "--audio-resampler=soxr",    # 高质量重采样(若可用,失败时回退默认)
-        "--file-caching=1500",       # 文件缓冲 (ms),避免本地播放卡顿
+        "--file-caching=300",        # 本地文件低延迟切歌;网络流仍保留较大缓冲
         "--network-caching=3000",    # 网络流缓冲
     ]
 
@@ -48,6 +50,16 @@ class AudioEngine(QObject):
 
         self._player: vlc.MediaPlayer = self._instance.media_player_new()
         self._current_path: Optional[str] = None
+        self._current_media = None
+        self._preloaded_path: Optional[str] = None
+        self._preloaded_media = None
+        self._preload_future: Optional[Future] = None
+        self._preload_generation = 0
+        self._preload_lock = threading.Lock()
+        self._preload_executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="walkman-audio-preload",
+        )
         self._duration_ms: int = 0
 
         # VLC 事件 → Qt 信号 (跨线程,所以只做最小操作)
@@ -71,19 +83,52 @@ class AudioEngine(QObject):
             self.error_occurred.emit(f"文件不存在: {path}")
             return False
 
-        media = self._instance.media_new(path)
-        # 解析媒体以拿到时长(对不同版本的 python-vlc 做兼容)
-        try:
-            media.parse_with_options(vlc.MediaParseFlag.local, 3000)
-        except Exception:
-            try:
-                media.parse()  # 旧 API
-            except Exception:
-                pass
+        media = self._take_preloaded_media(path)
+        if media is None:
+            media = self._make_media(path)
         self._player.set_media(media)
+        self._current_media = media
         self._current_path = path
         self._duration_ms = 0  # 等 length_changed 事件回填
         return True
+
+    def preload(self, path: Optional[str]) -> None:
+        """提前创建并解析下一首媒体,减少曲终切换时的加载成本。
+
+        单个 VLC MediaPlayer 仍然需要在曲终后 set_media(),所以这不是严格的
+        gapless 播放,但能避免下一首才开始做文件存在检查和媒体解析。
+        """
+        if not path or path == self._current_path:
+            self._clear_preload()
+            return
+        if not os.path.exists(path):
+            self._clear_preload()
+            return
+
+        with self._preload_lock:
+            if path == self._preloaded_path and (
+                self._preloaded_media is not None
+                or (self._preload_future is not None and not self._preload_future.done())
+            ):
+                return
+            self._preload_generation += 1
+            generation = self._preload_generation
+            self._preloaded_media = None
+            self._preloaded_path = path
+            future = self._preload_executor.submit(self._make_media, path)
+            self._preload_future = future
+
+        def _store_preloaded(done: Future) -> None:
+            try:
+                media = done.result()
+            except Exception:
+                return
+            with self._preload_lock:
+                if generation != self._preload_generation or path != self._preloaded_path:
+                    return
+                self._preloaded_media = media
+
+        future.add_done_callback(_store_preloaded)
 
     def play(self) -> None:
         if self._current_path is None:
@@ -137,10 +182,59 @@ class AudioEngine(QObject):
         try:
             self._poll_timer.stop()
             self._player.stop()
+            self._clear_preload()
+            self._preloaded_media = None
+            self._current_media = None
+            self._preload_executor.shutdown(wait=True, cancel_futures=True)
             self._player.release()
             self._instance.release()
         except Exception:
             pass
+
+    def _take_preloaded_media(self, path: str):
+        with self._preload_lock:
+            if path != self._preloaded_path:
+                return None
+            media = self._preloaded_media
+            future = self._preload_future
+        if media is None and future is not None:
+            try:
+                media = future.result(timeout=0.05)
+            except TimeoutError:
+                media = None
+            except Exception:
+                media = None
+        if media is None:
+            return None
+        with self._preload_lock:
+            if path != self._preloaded_path:
+                return None
+            self._preloaded_path = None
+            self._preloaded_media = None
+            self._preload_future = None
+            return media
+
+    def _clear_preload(self) -> None:
+        with self._preload_lock:
+            self._preload_generation += 1
+            future = self._preload_future
+            self._preloaded_path = None
+            self._preloaded_media = None
+            self._preload_future = None
+        if future is not None:
+            future.cancel()
+
+    def _make_media(self, path: str):
+        media = self._instance.media_new(path)
+        # 解析媒体以拿到时长(对不同版本的 python-vlc 做兼容)
+        try:
+            media.parse_with_options(vlc.MediaParseFlag.local, 3000)
+        except Exception:
+            try:
+                media.parse()  # 旧 API
+            except Exception:
+                pass
+        return media
 
     # ------------------------------------------------------------------
     # 内部回调

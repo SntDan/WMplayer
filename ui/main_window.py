@@ -279,6 +279,8 @@ class MainWindow(QMainWindow):
         self._playlist.changed.connect(self._on_playlist_changed)
         self._playlist.shuffled_changed.connect(self.player_panel.set_shuffled)
         self._playlist.repeat_changed.connect(self.player_panel.set_repeat)
+        self._playlist.shuffled_changed.connect(lambda _shuffled: self._preload_next_track())
+        self._playlist.repeat_changed.connect(lambda _repeat: self._preload_next_track())
 
         # 队列视图
         self.queue_panel.track_double_clicked.connect(self._play_index)
@@ -294,17 +296,18 @@ class MainWindow(QMainWindow):
 
         # 专辑视图
         self.albums_panel.play_paths_now.connect(self._play_paths_now)
+        self.albums_panel.play_paths_sequential.connect(self._play_paths_sequential_now)
         self.albums_panel.enqueue_paths.connect(self._enqueue_paths)
         self.albums_panel.add_paths_to_playlist.connect(self._add_paths_to_some_playlist)
 
         # 歌手视图
         self.artists_panel.play_paths_now.connect(self._play_paths_now)
+        self.artists_panel.play_paths_sequential.connect(self._play_paths_sequential_now)
         self.artists_panel.enqueue_paths.connect(self._enqueue_paths)
         self.artists_panel.add_paths_to_playlist.connect(self._add_paths_to_some_playlist)
 
         # 歌单视图
         self.playlists_panel.open_playlist.connect(self._on_open_playlist)
-        self.playlists_panel.new_empty_playlist.connect(self._on_new_empty_playlist)
         self.playlists_panel.rename_playlist.connect(self._on_rename_playlist)
         self.playlists_panel.delete_playlist.connect(self._on_delete_playlist)
 
@@ -531,6 +534,7 @@ class MainWindow(QMainWindow):
             self._engine.play()
         self._fetch_cover_async(track.path)
         self._load_lyrics_for(track.path)
+        self._preload_next_track()
 
     def _on_playlist_changed(self) -> None:
         """队列结构变化(洗牌、恢复原顺序、删除其它项等)时调用。
@@ -546,6 +550,15 @@ class MainWindow(QMainWindow):
         # 复用 set_track,但因为播放/封面/歌词都没变,这里只更新文字和编号即可。
         # set_track 内部会重置进度条和位置 → 不能用,我们自己写最小更新。
         self.player_panel.lbl_index.setText(f"{idx + 1}/{total}")
+        self._preload_next_track()
+
+    def _preload_next_track(self) -> None:
+        nxt = self._playlist.next_index(auto=True)
+        if nxt is None or nxt == self._playlist.current_index:
+            self._engine.preload(None)
+            return
+        track = self._playlist.get(nxt)
+        self._engine.preload(track.path if track else None)
 
     def _load_lyrics_for(self, audio_path: str) -> None:
         """根据音频路径找同名 .lrc,加载到歌词面板。"""
@@ -650,6 +663,12 @@ class MainWindow(QMainWindow):
         if len(self._playlist) > 0:
             self._play_index(new_start_index)
 
+    def _play_paths_sequential_now(self, paths: List[str], start_index: int = 0) -> None:
+        if not paths:
+            return
+        self._playlist.set_mode(PlayMode.SEQUENTIAL)
+        self._play_paths_now(paths, start_index)
+
     def _enqueue_paths(self, paths: List[str]) -> None:
         if not paths:
             return
@@ -710,10 +729,6 @@ class MainWindow(QMainWindow):
         self._switch_view(self.VIEW_QUEUE)
         if len(self._playlist) > 0:
             self._play_index(0)
-
-    def _on_new_empty_playlist(self, name: str) -> None:
-        if self._store.save(name, []):
-            self.statusBar().showMessage(f"已创建歌单 “{name}”", 3000)
 
     def _on_rename_playlist(self, old: str, new: str) -> None:
         if not self._store.is_writable(old):

@@ -28,6 +28,7 @@ ROLE_THUMB_PATH = Qt.ItemDataRole.UserRole + 1
 ROLE_SUBTITLE = Qt.ItemDataRole.UserRole + 2
 ROLE_IS_PLAYING = Qt.ItemDataRole.UserRole + 3
 ROLE_IS_HR = Qt.ItemDataRole.UserRole + 4
+ROLE_THUMB_PATHS = Qt.ItemDataRole.UserRole + 5
 
 
 _HR_BADGE_W = 26
@@ -64,17 +65,16 @@ class CoverRowDelegate(QStyledItemDelegate):
         thumb_y = rect.top()
         thumb_rect = QRect(thumb_x, thumb_y, self.THUMB_PX, self.THUMB_PX)
 
-        thumb_path = index.data(ROLE_THUMB_PATH)
-        pix = self._load_pixmap(thumb_path)
-        if pix is not None and not pix.isNull():
-            painter.drawPixmap(thumb_rect, pix)
+        thumb_paths = index.data(ROLE_THUMB_PATHS)
+        if isinstance(thumb_paths, (list, tuple)) and thumb_paths:
+            self._paint_mosaic(painter, thumb_rect, list(thumb_paths)[:4], option.font)
         else:
-            painter.fillRect(thumb_rect, QColor("#222"))
-            painter.setPen(QColor("#555"))
-            f = QFont(option.font)
-            self._set_font_size(f, self._base_pt(option.font) + 4)
-            painter.setFont(f)
-            painter.drawText(thumb_rect, Qt.AlignmentFlag.AlignCenter, "♪")
+            thumb_path = index.data(ROLE_THUMB_PATH)
+            pix = self._load_pixmap(thumb_path)
+            if pix is not None and not pix.isNull():
+                painter.drawPixmap(thumb_rect, pix)
+            else:
+                self._paint_placeholder(painter, thumb_rect, option.font)
 
         # HR 徽章 (右侧固定位置, 占的位置无论是否显示都保留, 让其他歌曲对齐)
         is_hr = bool(index.data(ROLE_IS_HR))
@@ -160,6 +160,43 @@ class CoverRowDelegate(QStyledItemDelegate):
         painter.setPen(_HR_GOLD)
         painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, "HR")
         painter.restore()
+
+    @classmethod
+    def _paint_mosaic(cls, painter: QPainter, rect: QRect, thumb_paths: list, base_font: QFont) -> None:
+        tile_w = rect.width() // 2
+        tile_h = rect.height() // 2
+        for i in range(4):
+            col = i % 2
+            row = i // 2
+            tile = QRect(
+                rect.left() + col * tile_w,
+                rect.top() + row * tile_h,
+                tile_w if col == 0 else rect.width() - tile_w,
+                tile_h if row == 0 else rect.height() - tile_h,
+            )
+            path = thumb_paths[i] if i < len(thumb_paths) else None
+            pix = cls._load_pixmap(path)
+            if pix is not None and not pix.isNull():
+                painter.drawPixmap(tile, pix)
+            else:
+                cls._paint_placeholder(painter, tile, base_font, compact=True)
+
+    @classmethod
+    def _paint_placeholder(
+        cls,
+        painter: QPainter,
+        rect: QRect,
+        base_font: QFont,
+        *,
+        compact: bool = False,
+    ) -> None:
+        painter.fillRect(rect, QColor("#222"))
+        painter.setPen(QColor("#555"))
+        f = QFont(base_font)
+        delta = 0 if compact else 4
+        cls._set_font_size(f, cls._base_pt(base_font) + delta)
+        painter.setFont(f)
+        painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, "♪")
 
     @staticmethod
     def _base_pt(font: QFont) -> int:
