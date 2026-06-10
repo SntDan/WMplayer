@@ -133,6 +133,9 @@ class LibraryPanel(QWidget):
         self.list.clear()
         tracks = self._library.tracks
         q = (text or "").strip().lower()
+        if not q:
+            self._add_song_rows(tracks)
+            return
 
         artists = defaultdict(list)
         albums = defaultdict(list)
@@ -184,7 +187,10 @@ class LibraryPanel(QWidget):
             )
 
         self._add_header(f"歌曲 ({len(song_rows)})")
-        for t in song_rows:
+        self._add_song_rows(song_rows)
+
+    def _add_song_rows(self, tracks) -> None:
+        for t in tracks:
             self._add_result_item(
                 "song",
                 t.title or "",

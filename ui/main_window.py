@@ -3,10 +3,13 @@
 ======
 把音频引擎 / 曲库 / 歌单 / 播放队列 / UI 全部连起来。
 
-右侧三视图(QStackedWidget)切换:
+右侧视图(QStackedWidget)切换:
   0  曲库 (LibraryPanel)
-  1  播放队列 (QueuePanel)
-  2  歌单 (PlaylistsPanel)
+  1  歌手 (ArtistsPanel)
+  2  专辑 (AlbumsPanel)
+  3  播放队列 (QueuePanel)
+  4  歌词 (LyricsPanel)
+  5  歌单 (PlaylistsPanel)
 顶部 segmented control 与左下三个红色图标(书 / 返回 / 文件夹)同步切换。
 """
 
@@ -95,7 +98,7 @@ class _CoverFetcher(QRunnable):
 # 右侧 segmented control
 # ----------------------------------------------------------------------
 class _Segmented(QWidget):
-    """四段切换:曲库 / 队列 / 歌单 / 歌词。"""
+    """顶部右侧视图切换。"""
 
     changed = pyqtSignal(int)
 
@@ -107,7 +110,7 @@ class _Segmented(QWidget):
 
         self._group = QButtonGroup(self)
         self._group.setExclusive(True)
-        labels = ["曲库", "专辑", "歌手", "播放队列", "歌单", "歌词"]
+        labels = ["曲库", "歌手", "专辑", "播放队列", "歌词", "歌单"]
         for i, label in enumerate(labels):
             b = QPushButton(label)
             b.setCheckable(True)
@@ -148,11 +151,11 @@ QPushButton:checked {
 class MainWindow(QMainWindow):
 
     VIEW_LIBRARY = 0
-    VIEW_ALBUMS = 1
-    VIEW_ARTISTS = 2
+    VIEW_ARTISTS = 1
+    VIEW_ALBUMS = 2
     VIEW_QUEUE = 3
-    VIEW_PLAYLISTS = 4
-    VIEW_LYRICS = 5
+    VIEW_LYRICS = 4
+    VIEW_PLAYLISTS = 5
 
     def __init__(self) -> None:
         super().__init__()
@@ -232,11 +235,11 @@ class MainWindow(QMainWindow):
         self.playlists_panel = PlaylistsPanel(self._store)
         self.lyrics_panel = LyricsPanel()
         self.stack.addWidget(self.library_panel)      # 0
-        self.stack.addWidget(self.albums_panel)       # 1
-        self.stack.addWidget(self.artists_panel)      # 2
+        self.stack.addWidget(self.artists_panel)      # 1
+        self.stack.addWidget(self.albums_panel)       # 2
         self.stack.addWidget(self.queue_panel)         # 3
-        self.stack.addWidget(self.playlists_panel)    # 4
-        self.stack.addWidget(self.lyrics_panel)        # 5
+        self.stack.addWidget(self.lyrics_panel)        # 4
+        self.stack.addWidget(self.playlists_panel)    # 5
         self.stack.setCurrentIndex(self.VIEW_QUEUE)
         rv.addWidget(self.stack, 1)
 

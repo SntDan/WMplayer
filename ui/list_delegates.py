@@ -48,7 +48,7 @@ class CoverRowDelegate(QStyledItemDelegate):
 
     def sizeHint(self, option: QStyleOptionViewItem, index) -> QSize:  # noqa: N802
         if bool(index.data(ROLE_SECTION_HEADER)):
-            return QSize(option.rect.width() if option.rect.width() > 0 else 200, 34)
+            return QSize(option.rect.width() if option.rect.width() > 0 else 200, 42)
         return QSize(option.rect.width() if option.rect.width() > 0 else 200, self.ROW_H)
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index) -> None:
@@ -173,11 +173,11 @@ class CoverRowDelegate(QStyledItemDelegate):
     def _paint_section_header(cls, painter: QPainter, rect: QRect, text: str, base_font: QFont) -> None:
         painter.fillRect(rect, QColor("#000000"))
         f = QFont(base_font)
-        cls._set_font_size(f, cls._base_pt(base_font) + 1)
+        cls._set_font_size(f, cls._base_pt(base_font) + 3)
         f.setBold(True)
         painter.setFont(f)
         painter.setPen(QColor("#FFFFFF"))
-        text_rect = QRect(rect.left(), rect.top() + 6, rect.width(), rect.height() - 8)
+        text_rect = QRect(rect.left(), rect.top() + 8, rect.width(), rect.height() - 12)
         painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, str(text))
         painter.setPen(_SEPARATOR_COLOR)
         painter.drawLine(rect.left(), rect.bottom(), rect.right(), rect.bottom())
