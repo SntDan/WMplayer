@@ -190,6 +190,9 @@ class MainWindow(QMainWindow):
         self._pool = QThreadPool.globalInstance()
         self._cover_signals = _CoverSignals(self)
         self._cover_signals.done.connect(self._on_cover_loaded)
+        self._cover_cache: dict[str, Optional[bytes]] = {}
+        self._cover_pending: set[str] = set()
+        self._cover_cache_limit = 64
 
         self._autoplay_after_load = True
 
@@ -543,6 +546,9 @@ class MainWindow(QMainWindow):
         track = self._playlist.get(index)
         if track is None:
             return
+        cached_cover = self._cover_cache.get(track.path)
+        if cached_cover and not track.cover:
+            track.cover = cached_cover
         self.player_panel.set_track(track, index, len(self._playlist))
         if self._engine.load(track.path) and self._autoplay_after_load:
             self._engine.play()
@@ -573,7 +579,11 @@ class MainWindow(QMainWindow):
             self._engine.preload(None)
             return
         track = self._playlist.get(nxt)
-        self._engine.preload(track.path if track else None)
+        if track is None:
+            self._engine.preload(None)
+            return
+        self._engine.preload(track.path)
+        self._fetch_cover_async(track.path)
 
     def _load_lyrics_for(self, audio_path: str) -> None:
         """根据音频路径找同名 .lrc,加载到歌词面板。"""
@@ -599,14 +609,37 @@ class MainWindow(QMainWindow):
     # ==================================================================
     # 封面后台读取
     # ==================================================================
+    def _remember_cover(self, path: str, cover: Optional[bytes]) -> None:
+        self._cover_cache[path] = cover
+        while len(self._cover_cache) > self._cover_cache_limit:
+            self._cover_cache.pop(next(iter(self._cover_cache)))
+
     def _fetch_cover_async(self, path: str) -> None:
+        if not path:
+            return
         cur = self._playlist.current
+        if path in self._cover_cache:
+            cover = self._cover_cache[path]
+            if cur and cur.path == path and cover:
+                cur.cover = cover
+                self.player_panel.cover.set_cover(cover)
+            return
         if cur and cur.path == path and cur.cover:
+            self._remember_cover(path, cur.cover)
             self.player_panel.cover.set_cover(cur.cover)
             return
+        if path in self._cover_pending:
+            return
+        self._cover_pending.add(path)
         self._pool.start(_CoverFetcher(path, self._cover_signals))
 
     def _on_cover_loaded(self, path: str, cover) -> None:
+        self._cover_pending.discard(path)
+        self._remember_cover(path, cover)
+        for t in self._playlist:
+            if t.path == path:
+                t.cover = cover
+                break
         cur = self._playlist.current
         if cur is None or cur.path != path:
             return
