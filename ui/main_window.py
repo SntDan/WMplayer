@@ -292,6 +292,8 @@ class MainWindow(QMainWindow):
         self.library_panel.play_paths_now.connect(self._play_paths_now)
         self.library_panel.enqueue_paths.connect(self._enqueue_paths)
         self.library_panel.add_paths_to_playlist.connect(self._add_paths_to_some_playlist)
+        self.library_panel.open_artist_requested.connect(self._open_artist_from_search)
+        self.library_panel.open_album_requested.connect(self._open_album_from_search)
         self.library_panel.rescan_requested.connect(self._rescan_library)
 
         # 专辑视图
@@ -352,6 +354,14 @@ class MainWindow(QMainWindow):
         if track and track.album:
             self._switch_view(self.VIEW_ALBUMS)
             self.albums_panel.show_album(track.album)
+
+    def _open_artist_from_search(self, artist: str) -> None:
+        self._switch_view(self.VIEW_ARTISTS)
+        self.artists_panel.show_artist(artist)
+
+    def _open_album_from_search(self, album: str) -> None:
+        self._switch_view(self.VIEW_ALBUMS)
+        self.albums_panel.show_album(album)
 
     def _switch_view(self, idx: int) -> None:
         self.segmented.set_index(idx)

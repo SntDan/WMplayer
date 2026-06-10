@@ -29,6 +29,7 @@ ROLE_SUBTITLE = Qt.ItemDataRole.UserRole + 2
 ROLE_IS_PLAYING = Qt.ItemDataRole.UserRole + 3
 ROLE_IS_HR = Qt.ItemDataRole.UserRole + 4
 ROLE_THUMB_PATHS = Qt.ItemDataRole.UserRole + 5
+ROLE_SECTION_HEADER = Qt.ItemDataRole.UserRole + 6
 
 
 _HR_BADGE_W = 26
@@ -46,6 +47,8 @@ class CoverRowDelegate(QStyledItemDelegate):
     HR_RESERVED_W = _HR_BADGE_W + 12   # 右侧给 HR 徽章预留的横向空间
 
     def sizeHint(self, option: QStyleOptionViewItem, index) -> QSize:  # noqa: N802
+        if bool(index.data(ROLE_SECTION_HEADER)):
+            return QSize(option.rect.width() if option.rect.width() > 0 else 200, 34)
         return QSize(option.rect.width() if option.rect.width() > 0 else 200, self.ROW_H)
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index) -> None:
@@ -53,6 +56,11 @@ class CoverRowDelegate(QStyledItemDelegate):
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         rect = option.rect
+
+        if bool(index.data(ROLE_SECTION_HEADER)):
+            self._paint_section_header(painter, rect, index.data(Qt.ItemDataRole.DisplayRole) or "", option.font)
+            painter.restore()
+            return
 
         # 背景: 选中 / 悬停
         if option.state & QStyle.StateFlag.State_Selected:
@@ -160,6 +168,19 @@ class CoverRowDelegate(QStyledItemDelegate):
         painter.setPen(_HR_GOLD)
         painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, "HR")
         painter.restore()
+
+    @classmethod
+    def _paint_section_header(cls, painter: QPainter, rect: QRect, text: str, base_font: QFont) -> None:
+        painter.fillRect(rect, QColor("#000000"))
+        f = QFont(base_font)
+        cls._set_font_size(f, cls._base_pt(base_font) + 1)
+        f.setBold(True)
+        painter.setFont(f)
+        painter.setPen(QColor("#FFFFFF"))
+        text_rect = QRect(rect.left(), rect.top() + 6, rect.width(), rect.height() - 8)
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, str(text))
+        painter.setPen(_SEPARATOR_COLOR)
+        painter.drawLine(rect.left(), rect.bottom(), rect.right(), rect.bottom())
 
     @classmethod
     def _paint_mosaic(cls, painter: QPainter, rect: QRect, thumb_paths: list, base_font: QFont) -> None:
