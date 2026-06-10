@@ -30,6 +30,10 @@ from core.lrc import Lyrics
 from .theme import Theme
 
 
+LYRIC_VISUAL_LEAD_MS = 240
+LYRIC_TEXT_CLIP_PAD = 3
+
+
 class _LyricsCanvas(QWidget):
     """实际绘制歌词的画布。"""
 
@@ -44,7 +48,7 @@ class _LyricsCanvas(QWidget):
         self._scroll: float = 0.0
         # 缓动动画(只在同步模式用)
         self._anim = QPropertyAnimation(self, b"scroll")
-        self._anim.setDuration(420)
+        self._anim.setDuration(180)
         self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
         # 字号
         self._font = QFont()
@@ -239,9 +243,9 @@ class _LyricsCanvas(QWidget):
             text_h = block_h - self._row_gap
             rect = QRect(
                 self._text_margin,
-                int(y_top + self._row_gap / 2),
+                int(y_top + self._row_gap / 2 - LYRIC_TEXT_CLIP_PAD),
                 int(max_w),
-                int(text_h),
+                int(text_h + LYRIC_TEXT_CLIP_PAD * 2),
             )
             p.drawText(rect, flags, text)
 
@@ -363,7 +367,7 @@ class LyricsPanel(QWidget):
             return
         if not self._lyrics.is_synced():
             return  # 纯文本不跟随
-        idx = self._lyrics.index_at(position_ms)
+        idx = self._lyrics.index_at(position_ms + LYRIC_VISUAL_LEAD_MS)
         self.canvas.set_current_index(idx)
 
     def has_lyrics(self) -> bool:
@@ -372,4 +376,4 @@ class LyricsPanel(QWidget):
     def _on_line_clicked(self, idx: int) -> None:
         if self._lyrics and 0 <= idx < len(self._lyrics):
             line = self._lyrics.lines[idx]
-            self.seek_to_ms.emit(max(0, line.time_ms + self._lyrics.offset_ms))
+            self.seek_to_ms.emit(max(0, line.time_ms + self._lyrics.offset_ms - LYRIC_VISUAL_LEAD_MS))

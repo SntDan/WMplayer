@@ -70,7 +70,7 @@ class AudioEngine(QObject):
 
         # 用 Qt 定时器轮询位置,避免在 VLC 回调线程里直接动 UI
         self._poll_timer = QTimer(self)
-        self._poll_timer.setInterval(200)  # 5 Hz 已经足够丝滑且省电
+        self._poll_timer.setInterval(80)  # 更密的位置更新,避免歌词高亮慢半拍
         self._poll_timer.timeout.connect(self._poll_position)
         self._poll_timer.start()
 
