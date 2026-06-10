@@ -31,6 +31,7 @@ from .theme import Theme
 
 
 LYRIC_VISUAL_LEAD_MS = 240
+LYRIC_ANIMATE_MAX_LINE_JUMP = 2
 LYRIC_TEXT_CLIP_PAD = 3
 
 
@@ -96,6 +97,10 @@ class _LyricsCanvas(QWidget):
         self._lyrics = lyrics
         self._current_index = -1
         self._scroll = 0.0
+        self._height_cache_key = (None, -1, -1)
+        self._heights = []
+        self._offsets = []
+        self._total_height = 0.0
         self._anim.stop()
         self._synced = bool(lyrics and lyrics.is_synced())
         # 同步模式 → 手指针,提示可点击;非同步 → 拖动手势,提示可拖
@@ -113,12 +118,13 @@ class _LyricsCanvas(QWidget):
             return
         if index == self._current_index:
             return
+        old_index = self._current_index
         self._current_index = index
         if self._lyrics and 0 <= index < len(self._lyrics):
             target = self._block_top(index) + self._block_height(index) / 2
         else:
             target = 0.0
-        if animate:
+        if animate and old_index >= 0 and abs(index - old_index) <= LYRIC_ANIMATE_MAX_LINE_JUMP:
             self._anim.stop()
             self._anim.setStartValue(self._scroll)
             self._anim.setEndValue(target)

@@ -159,7 +159,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("Music Player")
+        self.setWindowTitle("Walkman")
         # 默认 = 最小: 此尺寸下 left=right=491px (player_panel 在 h=760 下的自然宽度)。
         # 不允许再缩, 防止右侧视图被挤窄于左侧封面。
         self.setMinimumSize(QSize(983, 760))
@@ -560,6 +560,7 @@ class MainWindow(QMainWindow):
         total = len(self._playlist)
         if cur is None or idx < 0:
             # 队列空或当前无选中:不动播放器面板
+            self._engine.preload(None)
             return
         # 复用 set_track,但因为播放/封面/歌词都没变,这里只更新文字和编号即可。
         # set_track 内部会重置进度条和位置 → 不能用,我们自己写最小更新。
@@ -636,6 +637,7 @@ class MainWindow(QMainWindow):
         ans = QMessageBox.question(self, "清空队列", "确定要清空播放队列吗?")
         if ans == QMessageBox.StandardButton.Yes:
             self._engine.stop()
+            self._engine.preload(None)
             self._playlist.clear()
             self.player_panel.set_track(None, -1, 0)
             self.lyrics_panel.set_lyrics(None)

@@ -356,17 +356,8 @@ class AlbumCover(QWidget):
             sy = y + (side - scaled.height()) // 2
             p.drawPixmap(sx, sy, scaled)
         else:
-            # 无封面占位:画淡灰边框 + cover 字样
-            pen = QPen(QColor(80, 80, 80))
-            pen.setWidthF(1.0)
-            p.setPen(pen)
-            p.setBrush(Qt.BrushStyle.NoBrush)
-            p.drawRect(target.adjusted(0.5, 0.5, -0.5, -0.5))
-            f = QFont()
-            f.setPointSize(max(14, side // 12))
-            p.setFont(f)
-            p.setPen(Theme.TEXT_DIM)
-            p.drawText(target, Qt.AlignmentFlag.AlignCenter, "cover")
+            # 切歌等待异步封面时保持纯黑,避免占位文字闪烁。
+            p.fillRect(target, QColor("#000000"))
         p.end()
 
 

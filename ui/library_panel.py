@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import List, Optional
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QHBoxLayout,
@@ -114,7 +114,11 @@ class LibraryPanel(QWidget):
         self._library.scan_progress.connect(self._on_scan_progress)
         self._library.scan_finished.connect(self._on_scan_finished)
         self.btn_scan.clicked.connect(self.rescan_requested.emit)
-        self.search.textChanged.connect(self._apply_filter)
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(90)
+        self._search_timer.timeout.connect(lambda: self._apply_filter(self.search.text()))
+        self.search.textChanged.connect(lambda _text: self._search_timer.start())
         self.list.itemDoubleClicked.connect(self._on_double_click)
         self.list.customContextMenuRequested.connect(self._on_context_menu)
 
@@ -133,6 +137,7 @@ class LibraryPanel(QWidget):
         self.list.clear()
         tracks = self._library.tracks
         q = (text or "").strip().lower()
+        self.list.setUniformItemSizes(not bool(q))
         if not q:
             self._add_song_rows(tracks)
             return
