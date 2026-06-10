@@ -37,6 +37,7 @@ class ElidedLabel(QLabel):
 class AlbumsPanel(QWidget):
     play_paths_now = pyqtSignal(list, int)
     play_paths_sequential = pyqtSignal(list, int)
+    play_paths_shuffled = pyqtSignal(list)
     enqueue_paths = pyqtSignal(list)
     add_paths_to_playlist = pyqtSignal(list)
     back_to_artists_requested = pyqtSignal()
@@ -141,6 +142,10 @@ class AlbumsPanel(QWidget):
             self.btn_back_group.setCursor(Qt.CursorShape.PointingHandCursor)
             h_bottom.addWidget(self.btn_back_group)
             h_bottom.addStretch()
+            self.btn_shuffle_artist = QPushButton("随机播放")
+            self.btn_shuffle_artist.setStyleSheet(PRIMARY_BTN_QSS)
+            self.btn_shuffle_artist.setCursor(Qt.CursorShape.PointingHandCursor)
+            h_bottom.addWidget(self.btn_shuffle_artist)
             l0.addLayout(h_bottom)
 
         self.stack.addWidget(self.page_list)
@@ -209,6 +214,7 @@ class AlbumsPanel(QWidget):
         self.list_albums.itemClicked.connect(self._on_album_clicked)
         if self._embedded:
             self.btn_back_group.clicked.connect(self._on_back_to_artists)
+            self.btn_shuffle_artist.clicked.connect(self._on_shuffle_artist)
         self.btn_back.clicked.connect(lambda: self.stack.setCurrentIndex(0))
         self.list_tracks.itemDoubleClicked.connect(self._on_track_clicked)
         self.btn_play_all.clicked.connect(self._on_play_all)
@@ -323,6 +329,15 @@ class AlbumsPanel(QWidget):
         # 切回艺术家列表前清掉过滤,避免下次再打开时残留前一位艺术家的视图
         self._filter_artist = None
         self.back_to_artists_requested.emit()
+
+    def _on_shuffle_artist(self) -> None:
+        paths = [
+            t.path
+            for album in sorted(self._albums_tracks.keys())
+            for t in self._albums_tracks[album]
+        ]
+        if paths:
+            self.play_paths_shuffled.emit(paths)
         
     def _on_track_clicked(self, item: QListWidgetItem) -> None:
         path = item.data(Qt.ItemDataRole.UserRole)

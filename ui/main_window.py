@@ -303,6 +303,7 @@ class MainWindow(QMainWindow):
         # 歌手视图
         self.artists_panel.play_paths_now.connect(self._play_paths_now)
         self.artists_panel.play_paths_sequential.connect(self._play_paths_sequential_now)
+        self.artists_panel.play_paths_shuffled.connect(self._play_paths_shuffled_now)
         self.artists_panel.enqueue_paths.connect(self._enqueue_paths)
         self.artists_panel.add_paths_to_playlist.connect(self._add_paths_to_some_playlist)
 
@@ -668,6 +669,15 @@ class MainWindow(QMainWindow):
             return
         self._playlist.set_mode(PlayMode.SEQUENTIAL)
         self._play_paths_now(paths, start_index)
+
+    def _play_paths_shuffled_now(self, paths: List[str]) -> None:
+        if not paths:
+            return
+        tracks = self._tracks_from_paths(paths)
+        self._playlist.replace_with_tracks(tracks, -1)
+        self._playlist.set_mode(PlayMode.SHUFFLE)
+        if len(self._playlist) > 0:
+            self._play_index(0)
 
     def _enqueue_paths(self, paths: List[str]) -> None:
         if not paths:
