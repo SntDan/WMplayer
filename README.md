@@ -2,13 +2,7 @@
 
 [English](#english) | [中文](#中文)
 
-![WMplayer queue view](assets/screenshot.png)
-
----
-
 <a name="english"></a>
-## WMplayer
-
 WMplayer is a local desktop music player written in Python and PyQt6. It pairs a classic portable-player layout with a practical library workspace: album art and transport controls stay on the left, while the right side handles library search, artists, albums, queue management, synced lyrics, and playlists.
 
 It uses libVLC for playback, reads metadata with mutagen, and supports common lossless and lossy audio formats, including MP3, FLAC, WAV, ALAC, APE, OGG, Opus, and DSD.
@@ -139,8 +133,6 @@ WMplayer is an independent open-source project. It does not use third-party logo
 ---
 
 <a name="中文"></a>
-## WMplayer
-
 WMplayer 是一个用 Python 和 PyQt6 写的本地桌面音乐播放器。它把复古随身播放器式的左侧播放区和实用的右侧资料库工作区放在一起：左边负责封面、进度和播放控制，右边负责曲库搜索、歌手、专辑、播放队列、同步歌词和歌单。
 
 播放器基于 libVLC 播放音频，使用 mutagen 读取元数据，支持 MP3、FLAC、WAV、ALAC、APE、OGG、Opus、DSD 等常见有损和无损音频格式。
