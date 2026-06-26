@@ -2,6 +2,8 @@
 
 [English](#english) | [中文](#中文)
 
+![WMplayer screenshot](assets/screenshot.png)
+
 ---
 
 <a name="english"></a>
