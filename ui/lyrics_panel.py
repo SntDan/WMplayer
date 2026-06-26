@@ -198,7 +198,9 @@ class _LyricsCanvas(QWidget):
             p.setPen(Theme.TEXT_DIM)
             p.setFont(self._font)
             msg = tr("lyrics_missing_help")
-            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, msg)
+            rect = self.rect().adjusted(self._text_margin, 0, -self._text_margin, 0)
+            flags = int(Qt.TextFlag.TextWordWrap) | int(Qt.AlignmentFlag.AlignCenter)
+            p.drawText(rect, flags, msg)
             p.end()
             return
 
@@ -364,7 +366,7 @@ class LyricsPanel(QWidget):
         elif lyrics.is_synced():
             self.info_label.setText(f"{track_label}")
         else:
-            self.info_label.setText(f"{track_label} · {tr('plain_text')}")
+            self.info_label.setText(f"{track_label} - {tr('plain_text')}")
 
     def update_position(self, position_ms: int) -> None:
         if self._lyrics is None or len(self._lyrics) == 0:

@@ -106,7 +106,7 @@ class _Segmented(QWidget):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         h = QHBoxLayout(self)
-        h.setContentsMargins(20, 14, 20, 0)
+        h.setContentsMargins(12, 14, 12, 0)
         h.setSpacing(0)
 
         self._group = QButtonGroup(self)
@@ -141,7 +141,7 @@ QPushButton {
     color: #999;
     border: none;
     border-bottom: 2px solid transparent;
-    padding: 8px 16px;
+    padding: 8px 11px;
     font-size: 13px;
 }
 QPushButton:hover { color: #FFF; }
@@ -614,7 +614,7 @@ class MainWindow(QMainWindow):
         cur = self._playlist.current
         label = ""
         if cur is not None:
-            label = f"{cur.title} — {cur.artist}"
+            label = f"{cur.title} - {cur.artist}"
         self.lyrics_panel.set_lyrics(lyr, track_label=label)
         # 更新左上角"歌词"按钮的灰/白状态
         self.player_panel.set_lyrics_available(self.lyrics_panel.has_lyrics())

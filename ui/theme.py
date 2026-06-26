@@ -43,7 +43,7 @@ GLOBAL_QSS = """
 QWidget {
     background-color: #000000;
     color: #FFFFFF;
-    font-family: "Verdana", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
     font-size: 13px;
 }
 

@@ -18,7 +18,6 @@ if _HERE not in sys.path:
 
 
 def main() -> int:
-    from PyQt6.QtGui import QFont
     from PyQt6.QtWidgets import QApplication
     from ui.main_window import MainWindow
 
@@ -26,7 +25,6 @@ def main() -> int:
     QApplication.setOrganizationName("WMplayer")
 
     app = QApplication(sys.argv)
-    app.setFont(QFont("Verdana"))
     win = MainWindow()
     win.show()
     return app.exec()
