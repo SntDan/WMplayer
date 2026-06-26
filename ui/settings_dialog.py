@@ -15,6 +15,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -38,6 +39,7 @@ from core.config import (
     default_library_dir, default_playlists_dir,
 )
 from core.thumbnails import THUMB_DIR
+from ui.i18n import language, set_language, tr
 from ui.theme import BTN_QSS as _BTN_QSS, PRIMARY_BTN_QSS as _PRIMARY_BTN_QSS
 
 
@@ -51,7 +53,7 @@ def _make_default_label(prefix: str, path: str) -> QLabel:
     """构造一个灰色、不可改的"默认目录"提示行。"""
     lbl = QLabel(f"{prefix} {path}")
     lbl.setStyleSheet(_LOCKED_DEFAULT_QSS)
-    lbl.setToolTip("默认目录,始终启用,不可更改")
+    lbl.setToolTip(tr("default_dir_tooltip"))
     lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
     return lbl
 
@@ -60,23 +62,21 @@ class SettingsDialog(QDialog):
     def __init__(self, config: Config, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._config = config
-        self.setWindowTitle("设置")
+        set_language(str(self._config.get("language", language())))
+        self.setWindowTitle(tr("settings"))
         self.setMinimumSize(620, 500)
 
         layout = QVBoxLayout(self)
 
         tabs = QTabWidget()
-        tabs.addTab(self._build_library_tab(), "曲库")
-        tabs.addTab(self._build_playlists_tab(), "歌单")
-        tabs.addTab(self._build_general_tab(), "通用")
+        tabs.addTab(self._build_library_tab(), tr("library"))
+        tabs.addTab(self._build_playlists_tab(), tr("playlists"))
+        tabs.addTab(self._build_general_tab(), tr("general"))
         layout.addWidget(tabs, 1)
 
         # 关于
         about = QLabel(
-            "<div style='color:#9E9E9E;font-size:11px;'>"
-            "音频内核: libVLC &nbsp;·&nbsp; UI: PyQt6<br>"
-            "支持: MP3 / FLAC / WAV / ALAC / APE / OGG / Opus / DSD …"
-            "</div>"
+            tr("about")
         )
         about.setWordWrap(True)
         layout.addWidget(about)
@@ -101,9 +101,9 @@ class SettingsDialog(QDialog):
         v.setSpacing(8)
 
         # 默认目录(置顶、灰色、不可改)
-        v.addWidget(_make_default_label("默认目录:", default_library_dir()))
+        v.addWidget(_make_default_label(tr("default_dir"), default_library_dir()))
 
-        v.addWidget(QLabel("其他曲库目录:"))
+        v.addWidget(QLabel(tr("other_library_dirs")))
         self.lst_folders = QListWidget()
         self.lst_folders.setStyleSheet(
             "QListWidget{border:1px solid #333; background:#0a0a0a;}"
@@ -113,8 +113,8 @@ class SettingsDialog(QDialog):
         v.addWidget(self.lst_folders, 1)
 
         row = QHBoxLayout()
-        b_add = QPushButton("+ 添加文件夹")
-        b_remove = QPushButton("移除选中")
+        b_add = QPushButton(tr("add_folder"))
+        b_remove = QPushButton(tr("remove_selected"))
         for b in (b_add, b_remove):
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setStyleSheet(_BTN_QSS)
@@ -126,7 +126,7 @@ class SettingsDialog(QDialog):
         return w
 
     def _add_library_folder(self) -> None:
-        folder = QFileDialog.getExistingDirectory(self, "选择曲库根目录")
+        folder = QFileDialog.getExistingDirectory(self, tr("choose_library_root"))
         if not folder:
             return
         if self._list_contains(self.lst_folders, folder):
@@ -144,9 +144,9 @@ class SettingsDialog(QDialog):
         v = QVBoxLayout(w)
         v.setSpacing(8)
 
-        v.addWidget(_make_default_label("默认目录:", default_playlists_dir()))
+        v.addWidget(_make_default_label(tr("default_dir"), default_playlists_dir()))
 
-        v.addWidget(QLabel("其他歌单源或.m3u8文件:"))
+        v.addWidget(QLabel(tr("other_playlist_sources")))
         self.lst_playlist_locs = QListWidget()
         self.lst_playlist_locs.setStyleSheet(
             "QListWidget{border:1px solid #333; background:#0a0a0a;}"
@@ -156,9 +156,9 @@ class SettingsDialog(QDialog):
         v.addWidget(self.lst_playlist_locs, 1)
 
         row = QHBoxLayout()
-        b_add_dir = QPushButton("+ 添加文件夹")
-        b_add_file = QPushButton("+ 添加歌单文件")
-        b_remove = QPushButton("移除选中")
+        b_add_dir = QPushButton(tr("add_folder"))
+        b_add_file = QPushButton(tr("add_playlist_file"))
+        b_remove = QPushButton(tr("remove_selected"))
         for b in (b_add_dir, b_add_file, b_remove):
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setStyleSheet(_BTN_QSS)
@@ -170,10 +170,7 @@ class SettingsDialog(QDialog):
         b_remove.clicked.connect(lambda: self._remove_selected(self.lst_playlist_locs))
 
         hint = QLabel(
-            "<div style='color:#888;font-size:11px;'>"
-            "新建/重命名/删除的歌单都保存到默认目录。<br>"
-            "附加源里的歌单只能播放,不能修改。"
-            "</div>"
+            tr("playlist_hint")
         )
         hint.setWordWrap(True)
         v.addWidget(hint)
@@ -192,13 +189,13 @@ class SettingsDialog(QDialog):
         self.lst_playlist_locs.addItem(it)
 
     def _add_playlist_folder(self) -> None:
-        folder = QFileDialog.getExistingDirectory(self, "选择歌单文件夹")
+        folder = QFileDialog.getExistingDirectory(self, tr("choose_playlist_folder"))
         if folder:
             self._add_playlist_location_item(folder)
 
     def _add_playlist_file(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "选择歌单文件", "", "M3U Playlist (*.m3u8 *.m3u)"
+            self, tr("choose_playlist_file"), "", "M3U Playlist (*.m3u8 *.m3u)"
         )
         if path:
             self._add_playlist_location_item(path)
@@ -214,6 +211,14 @@ class SettingsDialog(QDialog):
         form = QFormLayout()
         form.setContentsMargins(0, 0, 0, 0)
 
+        self.combo_language = QComboBox()
+        self.combo_language.addItem(tr("language_en"), "en")
+        self.combo_language.addItem(tr("language_zh"), "zh")
+        current_lang = str(self._config.get("language", "en"))
+        idx = self.combo_language.findData(current_lang)
+        self.combo_language.setCurrentIndex(idx if idx >= 0 else 0)
+        form.addRow(tr("language"), self.combo_language)
+
         self.slider_vol = QSlider(Qt.Orientation.Horizontal)
         self.slider_vol.setRange(0, 100)
         self.slider_vol.setValue(int(self._config.get("volume", 80)))
@@ -224,9 +229,9 @@ class SettingsDialog(QDialog):
         wrap = QWidget()
         h = QHBoxLayout(wrap); h.setContentsMargins(0, 0, 0, 0)
         h.addWidget(self.slider_vol, 1); h.addWidget(self.lbl_vol)
-        form.addRow("音量", wrap)
+        form.addRow(tr("volume"), wrap)
 
-        self.chk_resume = QCheckBox("启动时恢复上次播放进度")
+        self.chk_resume = QCheckBox(tr("auto_resume"))
         self.chk_resume.setChecked(bool(self._config.get("auto_resume", True)))
         form.addRow("", self.chk_resume)
 
@@ -238,7 +243,7 @@ class SettingsDialog(QDialog):
         line.setStyleSheet("color: #333;")
         v.addWidget(line)
 
-        btn_reset = QPushButton("恢复出厂设置…")
+        btn_reset = QPushButton(tr("factory_reset"))
         btn_reset.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_reset.setStyleSheet(
             "QPushButton{background:#1a0505; border:1px solid #5a1a1a;"
@@ -252,8 +257,8 @@ class SettingsDialog(QDialog):
 
     def _on_factory_reset(self) -> None:
         reply = QMessageBox.question(
-            self, "恢复出厂设置",
-            "将清除所有缓存(曲库索引、播放队列)并恢复默认设置，然后自动关闭程序。\n此操作不可撤销，是否继续？",
+            self, tr("factory_reset_title"),
+            tr("factory_reset_confirm"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Cancel,
         )
@@ -318,4 +323,6 @@ class SettingsDialog(QDialog):
         self._config.set("playlist_locations", self.collected_playlist_locations())
         self._config.set("volume", self.slider_vol.value())
         self._config.set("auto_resume", self.chk_resume.isChecked())
+        self._config.set("language", self.combo_language.currentData() or "en")
+        set_language(str(self._config.get("language", "en")))
         self._config.save()

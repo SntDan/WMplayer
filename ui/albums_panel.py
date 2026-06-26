@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
 from core.library import Library
 from core.metadata import TrackMetadata
 from core.thumbnails import thumb_path_for
+from ui.i18n import tr
 from ui.list_delegates import CoverRowDelegate, ROLE_IS_HR, ROLE_SUBTITLE, ROLE_THUMB_PATH
 from ui.theme import PRIMARY_BTN_QSS
 
@@ -107,9 +108,9 @@ class AlbumsPanel(QWidget):
             l0.addLayout(h0)
         else:
             h0 = QHBoxLayout()
-            title0 = QLabel("专辑")
-            f = QFont(); f.setPointSize(15); f.setBold(True); title0.setFont(f)
-            h0.addWidget(title0)
+            self.title_label = QLabel(tr("albums"))
+            f = QFont(); f.setPointSize(15); f.setBold(True); self.title_label.setFont(f)
+            h0.addWidget(self.title_label)
             h0.addStretch()
             self.album_count = QLabel("0")
             self.album_count.setStyleSheet("color: #9E9E9E;")
@@ -117,7 +118,7 @@ class AlbumsPanel(QWidget):
             l0.addLayout(h0)
 
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("搜索专辑...")
+        self.search_box.setPlaceholderText(tr("search_albums"))
         self.search_box.setClearButtonEnabled(True)
         
         if self._embedded:
@@ -137,12 +138,12 @@ class AlbumsPanel(QWidget):
         
         if self._embedded:
             h_bottom = QHBoxLayout()
-            self.btn_back_group = QPushButton("返回")
+            self.btn_back_group = QPushButton(tr("back"))
             self.btn_back_group.setStyleSheet(PRIMARY_BTN_QSS)
             self.btn_back_group.setCursor(Qt.CursorShape.PointingHandCursor)
             h_bottom.addWidget(self.btn_back_group)
             h_bottom.addStretch()
-            self.btn_shuffle_artist = QPushButton("随机播放")
+            self.btn_shuffle_artist = QPushButton(tr("shuffle_play"))
             self.btn_shuffle_artist.setStyleSheet(PRIMARY_BTN_QSS)
             self.btn_shuffle_artist.setCursor(Qt.CursorShape.PointingHandCursor)
             h_bottom.addWidget(self.btn_shuffle_artist)
@@ -193,13 +194,13 @@ class AlbumsPanel(QWidget):
         l1.addWidget(self.list_tracks)
         
         h_back = QHBoxLayout()
-        self.btn_back = QPushButton("返回")
+        self.btn_back = QPushButton(tr("back"))
         self.btn_back.setStyleSheet(PRIMARY_BTN_QSS)
         self.btn_back.setCursor(Qt.CursorShape.PointingHandCursor)
         h_back.addWidget(self.btn_back)
         h_back.addStretch()
         
-        self.btn_play_all = QPushButton("顺序播放")
+        self.btn_play_all = QPushButton(tr("sequential_play"))
         self.btn_play_all.setStyleSheet(PRIMARY_BTN_QSS)
         self.btn_play_all.setCursor(Qt.CursorShape.PointingHandCursor)
         h_back.addWidget(self.btn_play_all)
@@ -223,10 +224,10 @@ class AlbumsPanel(QWidget):
         self._albums_tracks.clear()
         for t in self._library.tracks:
             if self._filter_artist:
-                a = t.artist.strip() if t.artist else "未知歌手"
+                a = t.artist.strip() if t.artist else tr("unknown_artist")
                 if a != self._filter_artist:
                     continue
-            album = t.album.strip() if t.album else "未知专辑"
+            album = t.album.strip() if t.album else tr("unknown_album")
             if album not in self._albums_tracks:
                 self._albums_tracks[album] = []
             self._albums_tracks[album].append(t)
@@ -265,11 +266,11 @@ class AlbumsPanel(QWidget):
                 self.lbl_artist_cover.clear()
                 self.lbl_artist_cover.setText("No\nCover")
         
-        self.album_count.setText(f"{len(albums)} 张专辑")
+        self.album_count.setText(tr("albums_count", n=len(albums)))
         if self._embedded:
             self.album_count.setVisible(False)
             if hasattr(self, 'lbl_embedded_subtitle'):
-                self.lbl_embedded_subtitle.setText(f"{len(albums)} 张专辑")
+                self.lbl_embedded_subtitle.setText(tr("albums_count", n=len(albums)))
                 
         self._apply_filter(self.search_box.text())
 
@@ -290,7 +291,7 @@ class AlbumsPanel(QWidget):
         
         tracks = self._albums_tracks.get(album, [])
         
-        artist_name = tracks[0].artist if tracks and tracks[0].artist else "未知歌手"
+        artist_name = tracks[0].artist if tracks and tracks[0].artist else tr("unknown_artist")
         self.lbl_album_artist.setText(artist_name)
         
         cover_pixmap = None
@@ -309,7 +310,7 @@ class AlbumsPanel(QWidget):
             self.lbl_album_cover.setPixmap(cover_pixmap)
         else:
             self.lbl_album_cover.clear()
-            self.lbl_album_cover.setText("无封面")
+            self.lbl_album_cover.setText(tr("no_cover"))
             
         for t in tracks:
             it = QListWidgetItem(t.title)
@@ -365,3 +366,15 @@ class AlbumsPanel(QWidget):
             self.play_paths_sequential.emit(paths, play_idx)
         else:
             self.play_paths_now.emit(paths, play_idx)
+
+    def retranslate(self) -> None:
+        if not self._embedded and hasattr(self, "title_label"):
+            self.title_label.setText(tr("albums"))
+        self.search_box.setPlaceholderText(tr("search_albums"))
+        if hasattr(self, "btn_back_group"):
+            self.btn_back_group.setText(tr("back"))
+        if hasattr(self, "btn_shuffle_artist"):
+            self.btn_shuffle_artist.setText(tr("shuffle_play"))
+        self.btn_back.setText(tr("back"))
+        self.btn_play_all.setText(tr("sequential_play"))
+        self.refresh()

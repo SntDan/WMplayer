@@ -28,6 +28,7 @@ from ui.theme import BTN_QSS as _BTN_QSS
 
 from core.playlist import Playlist
 from core.thumbnails import thumb_path_for
+from ui.i18n import tr
 from ui.list_delegates import (
     CoverRowDelegate,
     ROLE_IS_HR,
@@ -59,11 +60,11 @@ class QueuePanel(QWidget):
 
         # 标题行
         header = QHBoxLayout()
-        title = QLabel("播放队列")
-        f = QFont(); f.setPointSize(15); f.setBold(True); title.setFont(f)
-        self.count_label = QLabel("0 首")
+        self.title_label = QLabel(tr("queue"))
+        f = QFont(); f.setPointSize(15); f.setBold(True); self.title_label.setFont(f)
+        self.count_label = QLabel(tr("tracks_count", n=0))
         self.count_label.setStyleSheet("color: #9E9E9E;")
-        header.addWidget(title)
+        header.addWidget(self.title_label)
         header.addStretch(1)
         header.addWidget(self.count_label)
         outer.addLayout(header)
@@ -72,12 +73,12 @@ class QueuePanel(QWidget):
         action_row = QHBoxLayout()
         action_row.setSpacing(6)
         self.search = QLineEdit()
-        self.search.setPlaceholderText("搜索队列内")
+        self.search.setPlaceholderText(tr("search_queue"))
         self.search.setClearButtonEnabled(True)
         action_row.addWidget(self.search, 1)
 
-        self.btn_save = QPushButton("另存为歌单")
-        self.btn_clear = QPushButton("清空")
+        self.btn_save = QPushButton(tr("save_as_playlist"))
+        self.btn_clear = QPushButton(tr("clear"))
         for b in (self.btn_save, self.btn_clear):
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setStyleSheet(_BTN_QSS)
@@ -120,7 +121,7 @@ class QueuePanel(QWidget):
             it.setData(ROLE_SUBTITLE, t.artist or "")
             it.setData(ROLE_IS_HR, t.is_high_res())
             self.list.addItem(it)
-        self.count_label.setText(f"{len(self._playlist)} 首")
+        self.count_label.setText(tr("tracks_count", n=len(self._playlist)))
         self._highlight_current()
         self._apply_filter(self.search.text())
         self._scroll_to_current()
@@ -160,8 +161,8 @@ class QueuePanel(QWidget):
         if item is None:
             return
         menu = QMenu(self)
-        a_play = menu.addAction("播放")
-        a_remove = menu.addAction("从队列移除")
+        a_play = menu.addAction(tr("play"))
+        a_remove = menu.addAction(tr("remove_from_queue"))
         act = menu.exec(self.list.mapToGlobal(pos))
         idx = item.data(Qt.ItemDataRole.UserRole)
         if act == a_play:
@@ -178,7 +179,7 @@ class QueuePanel(QWidget):
     def _on_save(self) -> None:
         if len(self._playlist) == 0:
             return
-        name, ok = QInputDialog.getText(self, "另存为歌单", "歌单名称:")
+        name, ok = QInputDialog.getText(self, tr("save_as_playlist"), tr("playlist_name"))
         if ok and name.strip():
             self.save_as_playlist_requested.emit(name.strip())
 
@@ -195,3 +196,10 @@ class QueuePanel(QWidget):
                 continue
             hay = f"{t.title} {t.artist} {t.album} {t.filename}".lower()
             item.setHidden(text not in hay)
+
+    def retranslate(self) -> None:
+        self.title_label.setText(tr("queue"))
+        self.search.setPlaceholderText(tr("search_queue"))
+        self.btn_save.setText(tr("save_as_playlist"))
+        self.btn_clear.setText(tr("clear"))
+        self.count_label.setText(tr("tracks_count", n=len(self._playlist)))

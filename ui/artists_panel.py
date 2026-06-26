@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
 from core.library import Library
 from core.metadata import TrackMetadata
 from core.thumbnails import thumb_path_for
+from ui.i18n import tr
 from ui.list_delegates import CoverRowDelegate, ROLE_SUBTITLE, ROLE_THUMB_PATH
 
 class ArtistsPanel(QWidget):
@@ -37,9 +38,9 @@ class ArtistsPanel(QWidget):
         l0.setSpacing(10)
         
         h0 = QHBoxLayout()
-        title0 = QLabel("歌手")
-        f = QFont(); f.setPointSize(15); f.setBold(True); title0.setFont(f)
-        h0.addWidget(title0)
+        self.title_label = QLabel(tr("artists"))
+        f = QFont(); f.setPointSize(15); f.setBold(True); self.title_label.setFont(f)
+        h0.addWidget(self.title_label)
         h0.addStretch()
         self.artist_count = QLabel("0")
         self.artist_count.setStyleSheet("color: #9E9E9E;")
@@ -47,7 +48,7 @@ class ArtistsPanel(QWidget):
         l0.addLayout(h0)
 
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("搜索歌手...")
+        self.search_box.setPlaceholderText(tr("search_artists"))
         self.search_box.setClearButtonEnabled(True)
         l0.addWidget(self.search_box)
 
@@ -81,7 +82,7 @@ class ArtistsPanel(QWidget):
     def refresh(self) -> None:
         self._artists_tracks.clear()
         for t in self._library.tracks:
-            artist = t.artist.strip() if t.artist else "未知歌手"
+            artist = t.artist.strip() if t.artist else tr("unknown_artist")
             if artist not in self._artists_tracks:
                 self._artists_tracks[artist] = []
             self._artists_tracks[artist].append(t)
@@ -101,10 +102,10 @@ class ArtistsPanel(QWidget):
                 it.setData(ROLE_THUMB_PATH, thumb_path_for(tracks[0].path))
                 # 副标题: 该歌手有几张专辑
                 album_count = len({t.album for t in tracks})
-                it.setData(ROLE_SUBTITLE, f"{album_count} 张专辑")
+                it.setData(ROLE_SUBTITLE, tr("albums_count", n=album_count))
             self.list_artists.addItem(it)
 
-        self.artist_count.setText(f"{len(artists)} 位歌手")
+        self.artist_count.setText(tr("artists_count", n=len(artists)))
         self._apply_filter(self.search_box.text())
 
     def _apply_filter(self, text: str) -> None:
@@ -125,3 +126,9 @@ class ArtistsPanel(QWidget):
     def _on_artist_clicked(self, item: QListWidgetItem) -> None:
         artist = item.data(Qt.ItemDataRole.UserRole)
         self.show_artist(artist)
+
+    def retranslate(self) -> None:
+        self.title_label.setText(tr("artists"))
+        self.search_box.setPlaceholderText(tr("search_artists"))
+        self.refresh()
+        self.albums_subpanel.retranslate()

@@ -59,6 +59,7 @@ from core import lrc as lrc_mod
 
 from .albums_panel import AlbumsPanel
 from .artists_panel import ArtistsPanel
+from .i18n import set_language, tr
 from .library_panel import LibraryPanel
 from .lyrics_panel import LyricsPanel
 from .player_panel import PlayerPanel
@@ -110,9 +111,9 @@ class _Segmented(QWidget):
 
         self._group = QButtonGroup(self)
         self._group.setExclusive(True)
-        labels = ["曲库", "歌手", "专辑", "播放队列", "歌词", "歌单"]
-        for i, label in enumerate(labels):
-            b = QPushButton(label)
+        self._label_keys = ["library", "artists", "albums", "queue", "lyrics", "playlists"]
+        for i, key in enumerate(self._label_keys):
+            b = QPushButton(tr(key))
             b.setCheckable(True)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setStyleSheet(_SEG_QSS)
@@ -126,6 +127,12 @@ class _Segmented(QWidget):
         btn = self._group.button(idx)
         if btn is not None:
             btn.setChecked(True)
+
+    def retranslate(self) -> None:
+        for i, key in enumerate(self._label_keys):
+            btn = self._group.button(i)
+            if btn is not None:
+                btn.setText(tr(key))
 
 
 _SEG_QSS = """
@@ -159,12 +166,14 @@ class MainWindow(QMainWindow):
 
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("Walkman")
+        self.setWindowTitle("WMplayer")
         # 默认 = 最小: 此尺寸下 left=right=491px (player_panel 在 h=760 下的自然宽度)。
         # 不允许再缩, 防止右侧视图被挤窄于左侧封面。
         self.setMinimumSize(QSize(983, 760))
         self.resize(QSize(983, 760))
         self.setStyleSheet(GLOBAL_QSS)
+        self._config = Config()
+        set_language(str(self._config.get("language", "en")))
 
         # 跨屏(尤其是不同 DPI 屏)拖动还原: Qt 默认在 DPI 变化时按"物理像素守恒"
         # 重设窗口几何, 导致 logical (DIP) 尺寸跟着变 -- 用户从"最小"状态拖过去
@@ -179,7 +188,6 @@ class MainWindow(QMainWindow):
         self._screen_sig_wired = False
 
         # ------- 数据模型 -------
-        self._config = Config()
         self._engine = AudioEngine(self)
         self._playlist = Playlist(self)              # 当前播放队列
         self._library = Library(LIBRARY_CACHE_PATH, self)
@@ -277,7 +285,7 @@ class MainWindow(QMainWindow):
         self._engine.state_changed.connect(self._on_state_changed)
         self._engine.track_finished.connect(self._on_track_finished)
         self._engine.error_occurred.connect(
-            lambda msg: self.statusBar().showMessage(f"⚠ {msg}", 4000)
+            lambda msg: self.statusBar().showMessage(tr("error_status", msg=msg), 4000)
         )
 
         # 队列模型
@@ -378,6 +386,20 @@ class MainWindow(QMainWindow):
             self.albums_panel.stack.setCurrentIndex(0)
         elif idx == self.VIEW_ARTISTS:
             self.artists_panel.stack.setCurrentIndex(0)
+
+    def _retranslate_ui(self) -> None:
+        self.segmented.retranslate()
+        for panel in (
+            self.library_panel,
+            self.artists_panel,
+            self.albums_panel,
+            self.queue_panel,
+            self.lyrics_panel,
+            self.playlists_panel,
+        ):
+            fn = getattr(panel, "retranslate", None)
+            if callable(fn):
+                fn()
 
     # ==================================================================
     # 启动 / 关闭
@@ -667,7 +689,7 @@ class MainWindow(QMainWindow):
     def _on_clear_queue(self) -> None:
         if len(self._playlist) == 0:
             return
-        ans = QMessageBox.question(self, "清空队列", "确定要清空播放队列吗?")
+        ans = QMessageBox.question(self, tr("clear_queue_title"), tr("clear_queue_confirm"))
         if ans == QMessageBox.StandardButton.Yes:
             self._engine.stop()
             self._engine.preload(None)
@@ -681,9 +703,9 @@ class MainWindow(QMainWindow):
             return
         ok = self._store.save(name, self._playlist.paths)
         if ok:
-            self.statusBar().showMessage(f"已保存歌单 “{name}”", 3000)
+            self.statusBar().showMessage(tr("saved_playlist_status", name=name), 3000)
         else:
-            QMessageBox.warning(self, "保存失败", "无法写入歌单文件,请检查歌单目录权限。")
+            QMessageBox.warning(self, tr("save_failed_title"), tr("save_failed_msg"))
 
     # ==================================================================
     # 曲库操作
@@ -732,7 +754,7 @@ class MainWindow(QMainWindow):
             return
         tracks = self._tracks_from_paths(paths)
         n = self._playlist.append_tracks(tracks)
-        self.statusBar().showMessage(f"已加入 {n} 首到队列", 3000)
+        self.statusBar().showMessage(tr("added_to_queue_status", n=n), 3000)
 
     def _add_paths_to_some_playlist(self, paths: List[str]) -> None:
         if not paths:
@@ -740,21 +762,22 @@ class MainWindow(QMainWindow):
         names = self._store.list_names()
         if not names:
             # 没有歌单,直接新建一个
-            name, ok = QInputDialog.getText(self, "新建歌单", "歌单名称:")
+            name, ok = QInputDialog.getText(self, tr("new_playlist"), tr("playlist_name"))
             if not (ok and name.strip()):
                 return
             self._store.save(name.strip(), paths)
-            self.statusBar().showMessage(f"已创建歌单 “{name.strip()}” 并加入 {len(paths)} 首", 3000)
+            self.statusBar().showMessage(tr("create_playlist_status", name=name.strip(), n=len(paths)), 3000)
             return
         # 让用户选一个现有歌单 或 新建
-        names_with_new = ["<新建歌单>"] + names
+        new_label = f"<{tr('new_playlist')}>"
+        names_with_new = [new_label] + names
         choice, ok = QInputDialog.getItem(
-            self, "加入歌单", "选择目标歌单:", names_with_new, 0, False
+            self, tr("join_playlist"), tr("select_playlist"), names_with_new, 0, False
         )
         if not ok:
             return
-        if choice == "<新建歌单>":
-            name, ok = QInputDialog.getText(self, "新建歌单", "歌单名称:")
+        if choice == new_label:
+            name, ok = QInputDialog.getText(self, tr("new_playlist"), tr("playlist_name"))
             if not (ok and name.strip()):
                 return
             self._store.save(name.strip(), paths)
@@ -767,7 +790,7 @@ class MainWindow(QMainWindow):
                     seen.add(p)
             self._store.save(choice, existing)
             self.statusBar().showMessage(
-                f"已加入 {len(paths)} 首到歌单 “{choice}”", 3000
+                tr("added_to_playlist_status", n=len(paths), name=choice), 3000
             )
 
     def _rescan_library(self) -> None:
@@ -780,7 +803,7 @@ class MainWindow(QMainWindow):
     def _on_open_playlist(self, name: str) -> None:
         paths = self._store.load(name)
         if not paths:
-            QMessageBox.information(self, "歌单为空", f"歌单 “{name}” 是空的。")
+            QMessageBox.information(self, tr("empty_playlist_title"), tr("empty_playlist_msg", name=name))
             return
         self._playlist.replace_with_paths(paths)
         self._config.set("last_playlist_name", name)
@@ -791,16 +814,16 @@ class MainWindow(QMainWindow):
     def _on_rename_playlist(self, old: str, new: str) -> None:
         if not self._store.is_writable(old):
             QMessageBox.information(
-                self, "无法重命名", "该歌单来自附加源,只读。请把它复制到默认目录后再重命名。"
+                self, tr("readonly_rename_title"), tr("readonly_rename_msg")
             )
             return
         if not self._store.rename(old, new):
-            QMessageBox.warning(self, "重命名失败", "新名称可能已存在,或文件无法重命名。")
+            QMessageBox.warning(self, tr("rename_failed_title"), tr("rename_failed_msg"))
 
     def _on_delete_playlist(self, name: str) -> None:
         if not self._store.is_writable(name):
             QMessageBox.information(
-                self, "无法删除", "该歌单来自附加源,只读。请到对应位置手动删除。"
+                self, tr("readonly_delete_title"), tr("readonly_delete_msg")
             )
             return
         self._store.delete(name)
@@ -814,6 +837,8 @@ class MainWindow(QMainWindow):
             dlg.apply_to_config()
             # 把变更应用到运行中的对象
             self._engine.set_volume(int(self._config.get("volume", 80)))
+            set_language(str(self._config.get("language", "en")))
+            self._retranslate_ui()
             self._library.set_folders(self._config.library_folders_effective())
             self._store.set_locations(self._config.playlist_locations_effective())
             # 应用后自动重扫

@@ -34,6 +34,7 @@ from ui.list_delegates import (
     ROLE_SUBTITLE,
     ROLE_THUMB_PATH,
 )
+from ui.i18n import tr
 from ui.theme import BTN_QSS as _BTN_QSS
 
 
@@ -61,11 +62,11 @@ class LibraryPanel(QWidget):
 
         # 标题 + 计数
         header = QHBoxLayout()
-        title = QLabel("曲库")
-        f = QFont(); f.setPointSize(15); f.setBold(True); title.setFont(f)
-        self.count_label = QLabel("0 首")
+        self.title_label = QLabel(tr("library"))
+        f = QFont(); f.setPointSize(15); f.setBold(True); self.title_label.setFont(f)
+        self.count_label = QLabel(tr("tracks_count", n=0))
         self.count_label.setStyleSheet("color: #9E9E9E;")
-        header.addWidget(title)
+        header.addWidget(self.title_label)
         header.addStretch(1)
         header.addWidget(self.count_label)
         outer.addLayout(header)
@@ -74,11 +75,11 @@ class LibraryPanel(QWidget):
         action_row = QHBoxLayout()
         action_row.setSpacing(6)
         self.search = QLineEdit()
-        self.search.setPlaceholderText("搜索歌手 / 专辑 / 歌曲")
+        self.search.setPlaceholderText(tr("search_library"))
         self.search.setClearButtonEnabled(True)
         action_row.addWidget(self.search, 1)
 
-        self.btn_scan = QPushButton("扫描曲库")
+        self.btn_scan = QPushButton(tr("scan_library"))
         self.btn_scan.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_scan.setStyleSheet(_BTN_QSS)
         action_row.addWidget(self.btn_scan)
@@ -130,7 +131,7 @@ class LibraryPanel(QWidget):
     _ROLE_FILTER_HAY = Qt.ItemDataRole.UserRole + 12
 
     def refresh(self) -> None:
-        self.count_label.setText(f"{len(self._library.tracks)} 首")
+        self.count_label.setText(tr("tracks_count", n=len(self._library.tracks)))
         self._rebuild_results(self.search.text())
 
     def _rebuild_results(self, text: str) -> None:
@@ -145,8 +146,8 @@ class LibraryPanel(QWidget):
         artists = defaultdict(list)
         albums = defaultdict(list)
         for t in tracks:
-            artist = (t.artist or "未知歌手").strip() or "未知歌手"
-            album = (t.album or "未知专辑").strip() or "未知专辑"
+            artist = (t.artist or tr("unknown_artist")).strip() or tr("unknown_artist")
+            album = (t.album or tr("unknown_album")).strip() or tr("unknown_album")
             artists[artist].append(t)
             albums[(album, artist)].append(t)
 
@@ -169,29 +170,29 @@ class LibraryPanel(QWidget):
         album_rows.sort(key=lambda row: (row[0].lower(), row[1].lower()))
         song_rows.sort(key=lambda t: ((t.artist or "").lower(), (t.album or "").lower(), t.track_number if t.track_number > 0 else 9999, (t.title or "").lower()))
 
-        self._add_header(f"歌手 ({len(artist_rows)})")
+        self._add_header(tr("artist_header", n=len(artist_rows)))
         for artist, items in artist_rows:
-            albums_count = len({(t.album or "未知专辑").strip() or "未知专辑" for t in items})
+            albums_count = len({(t.album or tr("unknown_album")).strip() or tr("unknown_album") for t in items})
             self._add_result_item(
                 "artist",
                 artist,
-                f"{albums_count} 张专辑 · {len(items)} 首",
+                tr("album_track_count", albums=albums_count, tracks=len(items)),
                 items[0].path if items else "",
                 [t.path for t in items],
             )
 
-        self._add_header(f"专辑 ({len(album_rows)})")
+        self._add_header(tr("album_header", n=len(album_rows)))
         for album, artist, items in album_rows:
             self._add_result_item(
                 "album",
                 album,
-                f"{artist} · {len(items)} 首",
+                tr("artist_track_count", artist=artist, tracks=len(items)),
                 items[0].path if items else "",
                 [t.path for t in items],
                 data=album,
             )
 
-        self._add_header(f"歌曲 ({len(song_rows)})")
+        self._add_header(tr("song_header", n=len(song_rows)))
         self._add_song_rows(song_rows)
 
     def _add_song_rows(self, tracks) -> None:
@@ -239,14 +240,14 @@ class LibraryPanel(QWidget):
     def _on_scan_started(self) -> None:
         self.progress.setVisible(True)
         self.progress.setRange(0, 0)
-        self.progress.setFormat("正在扫描…")
+        self.progress.setFormat(tr("scanning"))
         self.btn_scan.setEnabled(False)
 
     def _on_scan_progress(self, done: int, total: int) -> None:
         if total > 0:
             self.progress.setRange(0, total)
             self.progress.setValue(done)
-            self.progress.setFormat(f"扫描中 {done}/{total}")
+            self.progress.setFormat(tr("scan_progress", done=done, total=total))
 
     def _on_scan_finished(self) -> None:
         self.progress.setVisible(False)
@@ -311,13 +312,13 @@ class LibraryPanel(QWidget):
         a_open = None
         a_play = a_enq = a_add = None
         if kind == "artist":
-            a_open = menu.addAction("打开歌手")
+            a_open = menu.addAction(tr("open_artist"))
         elif kind == "album":
-            a_open = menu.addAction("打开专辑")
+            a_open = menu.addAction(tr("open_album"))
         elif kind == "song":
-            a_play = menu.addAction("立即播放(替换队列)")
-            a_enq = menu.addAction("加入播放队列")
-            a_add = menu.addAction("加入歌单…")
+            a_play = menu.addAction(tr("play_now"))
+            a_enq = menu.addAction(tr("enqueue"))
+            a_add = menu.addAction(tr("add_to_playlist"))
         else:
             return
         act = menu.exec(self.list.mapToGlobal(pos))
@@ -336,3 +337,9 @@ class LibraryPanel(QWidget):
 
     def _apply_filter(self, text: str) -> None:
         self._rebuild_results(text)
+
+    def retranslate(self) -> None:
+        self.title_label.setText(tr("library"))
+        self.search.setPlaceholderText(tr("search_library"))
+        self.btn_scan.setText(tr("scan_library"))
+        self.refresh()

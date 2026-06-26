@@ -58,7 +58,7 @@ class AudioEngine(QObject):
         self._preload_lock = threading.Lock()
         self._preload_executor = ThreadPoolExecutor(
             max_workers=1,
-            thread_name_prefix="walkman-audio-preload",
+            thread_name_prefix="wmplayer-audio-preload",
         )
         self._duration_ms: int = 0
 

@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 
 from core.playlist_store import PlaylistStore
 from core.thumbnails import thumb_path_for
+from ui.i18n import tr
 from ui.list_delegates import CoverRowDelegate, ROLE_SUBTITLE, ROLE_THUMB_PATHS
 
 
@@ -49,11 +50,11 @@ class PlaylistsPanel(QWidget):
 
         # 标题
         header = QHBoxLayout()
-        title = QLabel("歌单")
-        f = QFont(); f.setPointSize(15); f.setBold(True); title.setFont(f)
-        self.count_label = QLabel("0 个")
+        self.title_label = QLabel(tr("playlists"))
+        f = QFont(); f.setPointSize(15); f.setBold(True); self.title_label.setFont(f)
+        self.count_label = QLabel(tr("items_count", n=0))
         self.count_label.setStyleSheet("color: #9E9E9E;")
-        header.addWidget(title)
+        header.addWidget(self.title_label)
         header.addStretch(1)
         header.addWidget(self.count_label)
         outer.addLayout(header)
@@ -82,17 +83,17 @@ class PlaylistsPanel(QWidget):
         self.list.customContextMenuRequested.connect(self._on_context_menu)
 
     def refresh(self) -> None:
-        self.path_label.setText(f"默认目录: {self._store.default_dir}")
+        self.path_label.setText(tr("default_playlist_dir", path=self._store.default_dir))
         self.list.clear()
         names = self._store.list_names()
         for name in names:
             paths = self._store.load(name)
             it = QListWidgetItem(name)
             it.setData(Qt.ItemDataRole.UserRole, name)
-            it.setData(ROLE_SUBTITLE, f"{len(paths)} 首")
+            it.setData(ROLE_SUBTITLE, tr("tracks_count", n=len(paths)))
             it.setData(ROLE_THUMB_PATHS, [thumb_path_for(p) for p in paths[:4]])
             self.list.addItem(it)
-        self.count_label.setText(f"{len(names)} 个")
+        self.count_label.setText(tr("items_count", n=len(names)))
 
     def _on_double_click(self, item: QListWidgetItem) -> None:
         name = item.data(Qt.ItemDataRole.UserRole)
@@ -105,19 +106,23 @@ class PlaylistsPanel(QWidget):
             return
         name = item.data(Qt.ItemDataRole.UserRole)
         menu = QMenu(self)
-        a_open = menu.addAction("加载并播放")
-        a_rename = menu.addAction("重命名…")
-        a_del = menu.addAction("删除")
+        a_open = menu.addAction(tr("load_and_play"))
+        a_rename = menu.addAction(tr("rename"))
+        a_del = menu.addAction(tr("delete"))
         act = menu.exec(self.list.mapToGlobal(pos))
         if act == a_open:
             self.open_playlist.emit(name)
         elif act == a_rename:
-            new, ok = QInputDialog.getText(self, "重命名", "新名称:", text=name)
+            new, ok = QInputDialog.getText(self, tr("rename"), tr("new_name"), text=name)
             if ok and new.strip() and new.strip() != name:
                 self.rename_playlist.emit(name, new.strip())
         elif act == a_del:
             ans = QMessageBox.question(
-                self, "删除歌单", f"确定要删除歌单 “{name}” 吗?\n(原始音乐文件不会被删除)"
+                self, tr("delete_playlist"), tr("delete_playlist_confirm", name=name)
             )
             if ans == QMessageBox.StandardButton.Yes:
                 self.delete_playlist.emit(name)
+
+    def retranslate(self) -> None:
+        self.title_label.setText(tr("playlists"))
+        self.refresh()

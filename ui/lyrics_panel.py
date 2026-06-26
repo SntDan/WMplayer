@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
 )
 
 from core.lrc import Lyrics
+from .i18n import tr
 from .theme import Theme
 
 
@@ -196,11 +197,7 @@ class _LyricsCanvas(QWidget):
         if self._lyrics is None or len(self._lyrics) == 0:
             p.setPen(Theme.TEXT_DIM)
             p.setFont(self._font)
-            msg = (
-                "未找到歌词\n\n"
-                "把同名 .lrc 文件放在歌曲同一目录下\n"
-                "(例如 song.flac → song.lrc)"
-            )
+            msg = tr("lyrics_missing_help")
             p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, msg)
             p.end()
             return
@@ -345,11 +342,11 @@ class LyricsPanel(QWidget):
         outer.setSpacing(8)
 
         header = QHBoxLayout()
-        title = QLabel("歌词")
-        f = QFont(); f.setPointSize(15); f.setBold(True); title.setFont(f)
+        self.title_label = QLabel(tr("lyrics"))
+        f = QFont(); f.setPointSize(15); f.setBold(True); self.title_label.setFont(f)
         self.info_label = QLabel("")
         self.info_label.setStyleSheet("color: #9E9E9E;")
-        header.addWidget(title)
+        header.addWidget(self.title_label)
         header.addStretch(1)
         header.addWidget(self.info_label)
         outer.addLayout(header)
@@ -360,13 +357,14 @@ class LyricsPanel(QWidget):
 
     def set_lyrics(self, lyrics: Optional[Lyrics], track_label: str = "") -> None:
         self._lyrics = lyrics
+        self._track_label = track_label
         self.canvas.set_lyrics(lyrics)
         if lyrics is None or len(lyrics) == 0:
-            self.info_label.setText("没有同名 .lrc 文件")
+            self.info_label.setText(tr("no_lrc"))
         elif lyrics.is_synced():
             self.info_label.setText(f"{track_label}")
         else:
-            self.info_label.setText(f"{track_label} · 纯文本")
+            self.info_label.setText(f"{track_label} · {tr('plain_text')}")
 
     def update_position(self, position_ms: int) -> None:
         if self._lyrics is None or len(self._lyrics) == 0:
@@ -383,3 +381,7 @@ class LyricsPanel(QWidget):
         if self._lyrics and 0 <= idx < len(self._lyrics):
             line = self._lyrics.lines[idx]
             self.seek_to_ms.emit(max(0, line.time_ms + self._lyrics.offset_ms - LYRIC_VISUAL_LEAD_MS))
+
+    def retranslate(self) -> None:
+        self.title_label.setText(tr("lyrics"))
+        self.set_lyrics(self._lyrics, getattr(self, "_track_label", ""))

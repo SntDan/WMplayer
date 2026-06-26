@@ -1,119 +1,239 @@
-# 高保真本地音乐播放器
+# WMplayer
 
-Python 写的桌面音乐播放器,黑底 + 白线 + 红按钮。
-内核 libVLC,支持 MP3 / FLAC / WAV / ALAC / APE / OGG / Opus / DSD 等。
+[English](#english) | [中文](#中文)
 
-## v1.1 新增
+---
 
-- **曲库 + 歌单 + 队列三层模型**(以前是单一播放列表)
-  - 曲库 = 你指定的若干文件夹,扫描出全部音频
-  - 歌单 = `playlists/` 目录下的多个 `.m3u8` 文件
-  - 队列 = 当前正在播的曲目列表
-- **M3U8 互通**:歌单格式与你给的样例一致(`#EXTM3U` + 路径行),可直接和 foobar2000 / Hi-By Music / Walkman 等互通
-- **增量扫描**:曲库元数据缓存到 `library_cache.json`,文件 mtime 没变就跳过重读
-- **右侧三视图切换**:曲库 / 队列 / 歌单 — 顶部分段控件 + 左下三个红色按钮都能切
+<a name="english"></a>
+## WMplayer
 
-## 目录结构
+WMplayer is a local desktop music player written in Python and PyQt6. It focuses on a black-and-white, classic portable music player style, with a left-side playback panel and a right-side library, artist, album, queue, lyrics, and playlist workspace.
 
-```
-music_player/
-├── README.md
-├── main.py                  ← 入口
-├── requirements.txt
-├── library/                 ← (可选)放音乐到这里,会被自动扫描
-├── playlists/               ← 歌单 .m3u8 文件存放在这里
-├── core/
-│   ├── audio_engine.py      ← libVLC 封装
-│   ├── playlist.py          ← 当前播放队列(含 4 种播放模式)
-│   ├── library.py           ← 曲库扫描 + 元数据缓存
-│   ├── playlist_store.py    ← 多 .m3u8 歌单 CRUD
-│   ├── m3u.py               ← M3U/M3U8 读写
-│   ├── metadata.py          ← MP3/FLAC/M4A/OGG 标签 + 封面
-│   └── config.py            ← 跨平台配置
-└── ui/
-    ├── widgets.py           ← 自绘按钮 / 进度条 / 封面
-    ├── player_panel.py      ← 左侧播放器
-    ├── library_panel.py     ← 右侧·曲库视图
-    ├── queue_panel.py       ← 右侧·队列视图
-    ├── playlists_panel.py   ← 右侧·歌单视图
-    ├── main_window.py       ← 主窗口
-    ├── settings_dialog.py   ← 设置(含曲库管理)
-    └── theme.py
-```
+It uses libVLC for playback and supports common lossless and lossy audio formats, including MP3, FLAC, WAV, ALAC, APE, OGG, Opus, and DSD.
 
-## 安装
+## Features
 
-### 1. 系统级:VLC
+- Local music library scanning with metadata cache
+- Album, artist, song, playlist, play queue, and lyrics views
+- Search results grouped by artist, album, and song
+- M3U/M3U8 playlist loading and saving
+- Sequential play, shuffle play, repeat-all, and repeat-one modes
+- Album playback limited to the selected album
+- Artist shuffle playback from the artist detail page
+- Cover thumbnails for fast scrolling
+- Async cover preloading to reduce cover flicker during track changes
+- LRC lyric parsing, synced lyric scrolling, and click-to-seek
+- English and Simplified Chinese UI, with English as the default
 
-- macOS: `brew install --cask vlc`
-- Windows: 到 https://www.videolan.org/vlc/ 下载安装(64 位 Python 装 64 位 VLC)
-- Linux: `sudo apt install vlc`
+## Requirements
 
-### 2. Python
-
-```bash
-cd music_player
-python -m venv .venv
-source .venv/bin/activate     # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-## 运行
-
-```bash
-python main.py
-# 或 python -m music_player
-```
-
-## 使用流程
-
-### 第一次
-
-1. 打开后点 **右下工具箱图标 → 设置 → 曲库** tab
-2. 添加你的音乐文件夹(可加多个),勾选"同时扫描程序自带 library/"
-3. 点 OK,程序会自动扫描
-
-或者:把音乐直接拖进程序根目录的 `library/` 子文件夹,启动时也会被扫描。
-
-### 切换三个视图
-
-- 左下 **红色书** = 曲库
-- 左下 **红色返回** = 播放队列(默认)
-- 中下 **红色文件夹** = 歌单
-- 也可以点右侧顶部 segmented control 切换
-
-### 创建歌单
-
-- 在曲库视图选中若干曲目 → 右键 → "加入歌单..." → 选已有或新建
-- 或在队列视图点 "另存为歌单"
-- 也可以手动把 `.m3u8` 文件拷到 `playlists/` 目录,程序自动识别
-
-### M3U8 格式
-
-```
-#EXTM3U
-#我的最爱.m3u8
-D:\Music\Vansire\After Fillmore County\Vansire - The Latter Teens.mp3
-D:\Music\GRAE\2725\GRAE - 2725.flac
-```
-
-注释行(`#` 开头的)解析时全部跳过,所以与各家播放器格式都兼容。
-
-## 快捷键
-
-| 键 | 作用 |
+| Dependency | Version |
 |---|---|
-| Space | 播放/暂停 |
-| ← / → | 后退/前进 5 秒 |
-| ↑ / ↓ | 音量 ±5 |
-| Delete | 从队列删除选中项 |
-| 双击 | 立即播放 |
+| Python | >= 3.10 |
+| PyQt6 | >= 6.5 |
+| python-vlc | >= 3.0.20 |
+| mutagen | >= 1.47 |
+| Pillow | >= 10.0 |
+| VLC media player | Required by libVLC |
 
-## 配置文件位置
+## Usage
 
-- macOS: `~/Library/Application Support/MusicPlayer/`
-- Linux: `~/.config/MusicPlayer/`
-- Windows: `%APPDATA%/MusicPlayer/`
+```bash
+python WMplayer.py
+```
 
-含 `settings.json`、`library_cache.json`、`queue.m3u8`(下次启动恢复用)。
-歌单本身在程序根的 `playlists/` 里(可在设置中改)。
+1. Install VLC on your system.
+2. Install Python dependencies with `pip install -r requirements.txt`.
+3. Start WMplayer.
+4. Open **Settings -> Library** and add your music folders.
+5. Scan the library.
+6. Use the right-side tabs to browse songs, artists, albums, the play queue, lyrics, and playlists.
+
+The app also scans the built-in `library/` folder if it exists.
+
+## Playlists
+
+WMplayer reads and writes M3U/M3U8 playlists. Playlist files are stored in the `playlists/` folder by default, and additional playlist folders or files can be added in Settings.
+
+```m3u
+#EXTM3U
+D:\Music\Album\Song 01.flac
+D:\Music\Album\Song 02.mp3
+```
+
+Lines beginning with `#` are treated as comments when reading playlists.
+
+## Lyrics
+
+Put a `.lrc` file with the same base name next to the audio file:
+
+```text
+Song.flac
+Song.lrc
+```
+
+Synced LRC files scroll automatically. Plain text lyric files can still be displayed, but they do not sync to playback.
+
+## Project Structure
+
+```text
+.
+|-- WMplayer.py              # Application entry point
+|-- requirements.txt         # Python dependencies
+|-- library/                 # Optional built-in music folder
+|-- playlists/               # Default playlist folder
+|-- core/
+|   |-- audio_engine.py      # libVLC playback engine
+|   |-- config.py            # Settings and app paths
+|   |-- library.py           # Library scanning and metadata cache
+|   |-- lrc.py               # LRC parser
+|   |-- m3u.py               # M3U/M3U8 reader and writer
+|   |-- metadata.py          # Audio metadata and cover reading
+|   |-- playlist.py          # Play queue and playback modes
+|   `-- playlist_store.py    # Playlist storage
+`-- ui/
+    |-- main_window.py       # Main window wiring
+    |-- player_panel.py      # Left playback panel
+    |-- library_panel.py     # Library view
+    |-- artists_panel.py     # Artist view
+    |-- albums_panel.py      # Album view
+    |-- queue_panel.py       # Play queue view
+    |-- lyrics_panel.py      # Lyrics view
+    |-- playlists_panel.py   # Playlist view
+    |-- settings_dialog.py   # Settings dialog
+    |-- i18n.py              # UI translations
+    |-- widgets.py           # Custom controls
+    `-- theme.py             # Theme styles
+```
+
+## Build
+
+```bash
+pyinstaller --noconfirm --onefile --windowed --name WMplayer WMplayer.py
+```
+
+## Brand Note
+
+WMplayer is an independent open-source project. It does not use third-party logos, product names, or official branding.
+
+## License
+
+No license file has been added yet. Add a license before publishing the repository as open source.
+
+---
+
+<a name="中文"></a>
+## WMplayer
+
+WMplayer 是一个用 Python 和 PyQt6 写的本地桌面音乐播放器。它采用黑底、白线、复古随身听式的视觉风格，左侧是播放控制区，右侧是曲库、歌手、专辑、播放队列、歌词和歌单工作区。
+
+播放器基于 libVLC，支持 MP3、FLAC、WAV、ALAC、APE、OGG、Opus、DSD 等常见有损和无损音频格式。
+
+## 功能
+
+- 本地曲库扫描和元数据缓存
+- 曲库、歌手、专辑、歌曲、歌单、播放队列和歌词视图
+- 搜索结果按歌手、专辑、歌曲分组显示
+- 支持读取和保存 M3U/M3U8 歌单
+- 支持顺序播放、随机播放、列表循环和单曲循环
+- 从专辑页播放时，队列会限制在当前专辑内
+- 歌手详情页支持随机播放该歌手全部歌曲
+- 使用封面缩略图提升长列表滚动性能
+- 提前读取封面，减少切歌时的封面闪烁
+- 支持 LRC 歌词解析、同步滚动和点击跳转
+- 支持英文和简体中文界面，默认使用英文
+
+## 运行要求
+
+| 依赖 | 版本 |
+|---|---|
+| Python | >= 3.10 |
+| PyQt6 | >= 6.5 |
+| python-vlc | >= 3.0.20 |
+| mutagen | >= 1.47 |
+| Pillow | >= 10.0 |
+| VLC media player | libVLC 需要 |
+
+## 使用方法
+
+```bash
+python WMplayer.py
+```
+
+1. 先在系统中安装 VLC。
+2. 使用 `pip install -r requirements.txt` 安装 Python 依赖。
+3. 启动 WMplayer。
+4. 打开 **Settings -> Library**，添加音乐文件夹。
+5. 扫描曲库。
+6. 通过右侧顶部标签浏览歌曲、歌手、专辑、播放队列、歌词和歌单。
+
+如果项目根目录下存在 `library/` 文件夹，程序也会扫描其中的音乐。
+
+## 歌单
+
+WMplayer 支持读取和保存 M3U/M3U8 歌单。默认歌单目录是 `playlists/`，也可以在设置中添加其他歌单文件夹或单独的歌单文件。
+
+```m3u
+#EXTM3U
+D:\Music\Album\Song 01.flac
+D:\Music\Album\Song 02.mp3
+```
+
+读取歌单时，`#` 开头的行会被当作注释跳过。
+
+## 歌词
+
+把同名 `.lrc` 文件放在歌曲同一目录下即可：
+
+```text
+Song.flac
+Song.lrc
+```
+
+带时间戳的 LRC 歌词会自动同步滚动。纯文本歌词也可以显示，但不会跟随播放进度。
+
+## 项目结构
+
+```text
+.
+|-- WMplayer.py              # 程序入口
+|-- requirements.txt         # Python 依赖
+|-- library/                 # 可选的内置音乐目录
+|-- playlists/               # 默认歌单目录
+|-- core/
+|   |-- audio_engine.py      # libVLC 播放引擎
+|   |-- config.py            # 设置和应用路径
+|   |-- library.py           # 曲库扫描和元数据缓存
+|   |-- lrc.py               # LRC 歌词解析
+|   |-- m3u.py               # M3U/M3U8 读写
+|   |-- metadata.py          # 音频元数据和封面读取
+|   |-- playlist.py          # 播放队列和播放模式
+|   `-- playlist_store.py    # 歌单存储
+`-- ui/
+    |-- main_window.py       # 主窗口连接逻辑
+    |-- player_panel.py      # 左侧播放面板
+    |-- library_panel.py     # 曲库视图
+    |-- artists_panel.py     # 歌手视图
+    |-- albums_panel.py      # 专辑视图
+    |-- queue_panel.py       # 播放队列视图
+    |-- lyrics_panel.py      # 歌词视图
+    |-- playlists_panel.py   # 歌单视图
+    |-- settings_dialog.py   # 设置窗口
+    |-- i18n.py              # 界面翻译
+    |-- widgets.py           # 自定义控件
+    `-- theme.py             # 主题样式
+```
+
+## 打包
+
+```bash
+pyinstaller --noconfirm --onefile --windowed --name WMplayer WMplayer.py
+```
+
+## 品牌说明
+
+WMplayer 是独立开源项目，不使用第三方 logo、产品名或官方品牌素材。
+
+## 许可证
+
+目前还没有添加许可证文件。如果要正式作为开源项目发布，建议先补充许可证。

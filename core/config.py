@@ -18,7 +18,7 @@ from typing import Any, Dict, List
 # 路径
 # ----------------------------------------------------------------------
 def program_root() -> str:
-    """程序根目录(music_player/ 目录所在位置)。"""
+    """程序根目录(WMplayer/ 目录所在位置)。"""
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -61,6 +61,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "last_track_path": "",
     "window_geometry": None,
     "auto_resume": True,
+    "language": "en",
 
     # 用户在设置里加的曲库目录(默认 library/ 始终额外扫描,不在此列表)
     "library_folders": [],
