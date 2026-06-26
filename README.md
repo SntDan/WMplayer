@@ -118,7 +118,7 @@ WMplayer is an independent open-source project. It does not use third-party logo
 
 ## License
 
-No license file has been added yet. Add a license before publishing the repository as open source.
+[MIT](LICENSE)
 
 ---
 
@@ -236,4 +236,4 @@ WMplayer 是独立开源项目，不使用第三方 logo、产品名或官方品
 
 ## 许可证
 
-目前还没有添加许可证文件。如果要正式作为开源项目发布，建议先补充许可证。
+[MIT](LICENSE)
