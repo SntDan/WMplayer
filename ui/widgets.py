@@ -490,7 +490,23 @@ class ScrollingLabel(QLabel):
 
     def needs_scroll(self) -> bool:
         """文字宽度是否超出可视宽度。"""
-        return self.fontMetrics().horizontalAdvance(self.text()) > max(1, self.width())
+        return self.scroll_limit() > 0
+
+    def scroll_limit(self) -> int:
+        text_w = self.fontMetrics().horizontalAdvance(self.text())
+        return max(0, text_w - self.width() + 20)
+
+    def set_scroll_offset(self, offset: int) -> None:
+        new_offset = max(0, min(int(offset), self.scroll_limit()))
+        if self._offset != new_offset:
+            self._offset = new_offset
+            self.update()
+
+    def reset_scroll(self) -> None:
+        self._offset = 0
+        self._direction = 1
+        self._pause_ticks = 0
+        self.update()
 
     def tick(self) -> None:
         """由外部统一计时器驱动一格滚动。"""
@@ -501,8 +517,7 @@ class ScrollingLabel(QLabel):
             return
 
         self._offset += self._direction
-        fm = self.fontMetrics()
-        max_off = fm.horizontalAdvance(self.text()) - self.width() + 20
+        max_off = self.scroll_limit()
         if max_off <= 0:
             self._offset = 0
             self._direction = 1

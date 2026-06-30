@@ -79,6 +79,9 @@ class PlayerPanel(QWidget):
         self._is_playing = False
         self._shuffled: bool = False
         self._repeat: RepeatMode = RepeatMode.NONE
+        self._info_scroll_pos = 0
+        self._info_scroll_direction = 1
+        self._info_scroll_pause_ticks = 0
         self._refresh_mode_buttons()
         # 三个滚动标签共享同一个计时器, 保证多行同步前进; 节奏比默认慢一点
         self._scroll_timer = QTimer(self)
@@ -289,10 +292,12 @@ class PlayerPanel(QWidget):
             self.progress.set_position(0)
             self.progress.set_duration(0)
             self.hr_badge.set_visible_hr(False)
+            self._reset_info_scrolling()
             return
         self.lbl_title.setText(track.title)
         self.lbl_artist.setText(track.artist)
         self.lbl_album.setText(track.album)
+        self._reset_info_scrolling()
         self.lbl_index.setText(f"{index + 1}/{total}")
         self.cover.set_cover(track.cover)
         self.lbl_dur.setText(_format_ms(track.duration_ms))
@@ -346,6 +351,13 @@ class PlayerPanel(QWidget):
         self.btn_repeat.set_active(repeat_on)
         self.btn_repeat.set_enabled_visual(repeat_on)
         self.btn_repeat.set_icon("repeat_one" if self._repeat == RepeatMode.ONE else "repeat")
+
+    def _reset_info_scrolling(self) -> None:
+        self._info_scroll_pos = 0
+        self._info_scroll_direction = 1
+        self._info_scroll_pause_ticks = 0
+        for lbl in (self.lbl_title, self.lbl_artist, self.lbl_album):
+            lbl.reset_scroll()
 
     # ------------------------------------------------------------------
     # 几何锁定
@@ -405,6 +417,29 @@ class PlayerPanel(QWidget):
                 info.setFixedWidth(info_w)
 
     def _tick_scrolling_labels(self) -> None:
-        # 同一计时器驱动三个标签, 哪一行需要滚动它就走一格, 多行天然同步
-        for lbl in (self.lbl_title, self.lbl_artist, self.lbl_album):
-            lbl.tick()
+        labels = (self.lbl_title, self.lbl_artist, self.lbl_album)
+        limits = [lbl.scroll_limit() if lbl.isVisible() else 0 for lbl in labels]
+        max_limit = max(limits, default=0)
+        if max_limit <= 0:
+            if self._info_scroll_pos:
+                self._reset_info_scrolling()
+            return
+
+        if self._info_scroll_pos > max_limit:
+            self._info_scroll_pos = max_limit
+
+        if self._info_scroll_pause_ticks > 0:
+            self._info_scroll_pause_ticks -= 1
+        else:
+            self._info_scroll_pos += self._info_scroll_direction
+            if self._info_scroll_pos >= max_limit:
+                self._info_scroll_pos = max_limit
+                self._info_scroll_direction = -1
+                self._info_scroll_pause_ticks = 12
+            elif self._info_scroll_pos <= 0:
+                self._info_scroll_pos = 0
+                self._info_scroll_direction = 1
+                self._info_scroll_pause_ticks = 12
+
+        for lbl, limit in zip(labels, limits):
+            lbl.set_scroll_offset(min(self._info_scroll_pos, limit))
