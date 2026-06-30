@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
@@ -75,7 +75,11 @@ class ArtistsPanel(QWidget):
 
     def _wire(self) -> None:
         self._library.tracks_changed.connect(self.refresh)
-        self.search_box.textChanged.connect(self._apply_filter)
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(90)
+        self._search_timer.timeout.connect(lambda: self._apply_filter(self.search_box.text()))
+        self.search_box.textChanged.connect(lambda _text: self._search_timer.start())
         # 单信号: 单击进入(避免双击触发两次重复加载)
         self.list_artists.itemClicked.connect(self._on_artist_clicked)
 
@@ -91,6 +95,7 @@ class ArtistsPanel(QWidget):
         for artist in self._artists_tracks:
             self._artists_tracks[artist].sort(key=lambda t: (t.album or "", t.title or ""))
 
+        self.list_artists.setUpdatesEnabled(False)
         self.list_artists.clear()
         artists = sorted(self._artists_tracks.keys())
         for a in artists:
@@ -105,6 +110,7 @@ class ArtistsPanel(QWidget):
                 it.setData(ROLE_SUBTITLE, tr("albums_count", n=album_count))
             self.list_artists.addItem(it)
 
+        self.list_artists.setUpdatesEnabled(True)
         self.artist_count.setText(tr("artists_count", n=len(artists)))
         self._apply_filter(self.search_box.text())
 

@@ -135,65 +135,69 @@ class LibraryPanel(QWidget):
         self._rebuild_results(self.search.text())
 
     def _rebuild_results(self, text: str) -> None:
-        self.list.clear()
-        tracks = self._library.tracks
-        q = (text or "").strip().lower()
-        self.list.setUniformItemSizes(not bool(q))
-        if not q:
-            self._add_song_rows(tracks)
-            return
+        self.list.setUpdatesEnabled(False)
+        try:
+            self.list.clear()
+            tracks = self._library.tracks
+            q = (text or "").strip().lower()
+            self.list.setUniformItemSizes(not bool(q))
+            if not q:
+                self._add_song_rows(tracks)
+                return
 
-        artists = defaultdict(list)
-        albums = defaultdict(list)
-        for t in tracks:
-            artist = (t.artist or tr("unknown_artist")).strip() or tr("unknown_artist")
-            album = (t.album or tr("unknown_album")).strip() or tr("unknown_album")
-            artists[artist].append(t)
-            albums[(album, artist)].append(t)
+            artists = defaultdict(list)
+            albums = defaultdict(list)
+            for t in tracks:
+                artist = (t.artist or tr("unknown_artist")).strip() or tr("unknown_artist")
+                album = (t.album or tr("unknown_album")).strip() or tr("unknown_album")
+                artists[artist].append(t)
+                albums[(album, artist)].append(t)
 
-        artist_rows = [
-            (artist, sorted(items, key=lambda t: ((t.album or ""), (t.track_number if t.track_number > 0 else 9999), t.title or "")))
-            for artist, items in artists.items()
-            if not q or q in artist.lower()
-        ]
-        album_rows = [
-            (album, artist, sorted(items, key=lambda t: (t.track_number if t.track_number > 0 else 9999, t.title or "")))
-            for (album, artist), items in albums.items()
-            if not q or q in album.lower() or q in artist.lower()
-        ]
-        song_rows = [
-            t for t in tracks
-            if not q or q in f"{t.title or ''} {t.artist or ''} {t.album or ''}".lower()
-        ]
+            artist_rows = [
+                (artist, sorted(items, key=lambda t: ((t.album or ""), (t.track_number if t.track_number > 0 else 9999), t.title or "")))
+                for artist, items in artists.items()
+                if not q or q in artist.lower()
+            ]
+            album_rows = [
+                (album, artist, sorted(items, key=lambda t: (t.track_number if t.track_number > 0 else 9999, t.title or "")))
+                for (album, artist), items in albums.items()
+                if not q or q in album.lower() or q in artist.lower()
+            ]
+            song_rows = [
+                t for t in tracks
+                if not q or q in f"{t.title or ''} {t.artist or ''} {t.album or ''}".lower()
+            ]
 
-        artist_rows.sort(key=lambda row: row[0].lower())
-        album_rows.sort(key=lambda row: (row[0].lower(), row[1].lower()))
-        song_rows.sort(key=lambda t: ((t.artist or "").lower(), (t.album or "").lower(), t.track_number if t.track_number > 0 else 9999, (t.title or "").lower()))
+            artist_rows.sort(key=lambda row: row[0].lower())
+            album_rows.sort(key=lambda row: (row[0].lower(), row[1].lower()))
+            song_rows.sort(key=lambda t: ((t.artist or "").lower(), (t.album or "").lower(), t.track_number if t.track_number > 0 else 9999, (t.title or "").lower()))
 
-        self._add_header(tr("artist_header", n=len(artist_rows)))
-        for artist, items in artist_rows:
-            albums_count = len({(t.album or tr("unknown_album")).strip() or tr("unknown_album") for t in items})
-            self._add_result_item(
-                "artist",
-                artist,
-                tr("album_track_count", albums=albums_count, tracks=len(items)),
-                items[0].path if items else "",
-                [t.path for t in items],
-            )
+            self._add_header(tr("artist_header", n=len(artist_rows)))
+            for artist, items in artist_rows:
+                albums_count = len({(t.album or tr("unknown_album")).strip() or tr("unknown_album") for t in items})
+                self._add_result_item(
+                    "artist",
+                    artist,
+                    tr("album_track_count", albums=albums_count, tracks=len(items)),
+                    items[0].path if items else "",
+                    [t.path for t in items],
+                )
 
-        self._add_header(tr("album_header", n=len(album_rows)))
-        for album, artist, items in album_rows:
-            self._add_result_item(
-                "album",
-                album,
-                tr("artist_track_count", artist=artist, tracks=len(items)),
-                items[0].path if items else "",
-                [t.path for t in items],
-                data=album,
-            )
+            self._add_header(tr("album_header", n=len(album_rows)))
+            for album, artist, items in album_rows:
+                self._add_result_item(
+                    "album",
+                    album,
+                    tr("artist_track_count", artist=artist, tracks=len(items)),
+                    items[0].path if items else "",
+                    [t.path for t in items],
+                    data=album,
+                )
 
-        self._add_header(tr("song_header", n=len(song_rows)))
-        self._add_song_rows(song_rows)
+            self._add_header(tr("song_header", n=len(song_rows)))
+            self._add_song_rows(song_rows)
+        finally:
+            self.list.setUpdatesEnabled(True)
 
     def _add_song_rows(self, tracks) -> None:
         for t in tracks:

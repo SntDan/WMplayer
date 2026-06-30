@@ -1,4 +1,4 @@
 PyQt6>=6.5.0
-python-vlc>=3.0.20
+pywin32>=306; platform_system == "Windows"
 mutagen>=1.47.0
 Pillow>=10.0.0

@@ -1,6 +1,6 @@
 import os
 from typing import List, Optional, Dict
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QPainter, QPixmap
 from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
@@ -210,7 +210,11 @@ class AlbumsPanel(QWidget):
 
     def _wire(self) -> None:
         self._library.tracks_changed.connect(self.refresh)
-        self.search_box.textChanged.connect(self._apply_filter)
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(90)
+        self._search_timer.timeout.connect(lambda: self._apply_filter(self.search_box.text()))
+        self.search_box.textChanged.connect(lambda _text: self._search_timer.start())
         # 单信号: 单击直接进详情(避免双击同时触发 click+doubleClick 重复加载封面)
         self.list_albums.itemClicked.connect(self._on_album_clicked)
         if self._embedded:
@@ -235,6 +239,7 @@ class AlbumsPanel(QWidget):
         for tracks in self._albums_tracks.values():
             tracks.sort(key=lambda t: (t.track_number if t.track_number > 0 else 9999, t.title or ""))
 
+        self.list_albums.setUpdatesEnabled(False)
         self.list_albums.clear()
         albums = sorted(self._albums_tracks.keys())
         for a in albums:
@@ -247,6 +252,8 @@ class AlbumsPanel(QWidget):
                 it.setData(ROLE_IS_HR, all(t.is_high_res() for t in tracks))
             self.list_albums.addItem(it)
             
+        self.list_albums.setUpdatesEnabled(True)
+
         if self._embedded and self._filter_artist:
             # 用预生成的缩略图代替同步读完整封面,避免 refresh() 阻塞 UI
             artist_cover_set = False
@@ -287,6 +294,7 @@ class AlbumsPanel(QWidget):
     def show_album(self, album: str) -> None:
         self._current_album = album
         self.lbl_album_title.setText(album)
+        self.list_tracks.setUpdatesEnabled(False)
         self.list_tracks.clear()
         
         tracks = self._albums_tracks.get(album, [])
@@ -320,6 +328,7 @@ class AlbumsPanel(QWidget):
             it.setData(ROLE_IS_HR, t.is_high_res())
             self.list_tracks.addItem(it)
             
+        self.list_tracks.setUpdatesEnabled(True)
         self.stack.setCurrentIndex(1)
 
     def _on_album_clicked(self, item: QListWidgetItem) -> None:

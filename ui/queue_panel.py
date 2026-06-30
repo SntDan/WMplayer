@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QHBoxLayout,
@@ -49,6 +49,8 @@ class QueuePanel(QWidget):
     def __init__(self, playlist: Playlist, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._playlist = playlist
+        self._index_items = {}
+        self._current_item = None
         self._build_ui()
         self._wire()
         self.refresh()
@@ -104,7 +106,11 @@ class QueuePanel(QWidget):
         self.list.customContextMenuRequested.connect(self._on_context_menu)
         self.btn_save.clicked.connect(self._on_save)
         self.btn_clear.clicked.connect(self.clear_requested.emit)
-        self.search.textChanged.connect(self._apply_filter)
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(90)
+        self._search_timer.timeout.connect(lambda: self._apply_filter(self.search.text()))
+        self.search.textChanged.connect(lambda _text: self._search_timer.start())
 
         sc = QShortcut(QKeySequence("Delete"), self.list)
         sc.activated.connect(self._delete_selected)
@@ -113,14 +119,21 @@ class QueuePanel(QWidget):
     # 数据更新
     # ------------------------------------------------------------------
     def refresh(self) -> None:
-        self.list.clear()
-        for i, t in enumerate(self._playlist.tracks):
-            it = QListWidgetItem(t.title or "")
-            it.setData(Qt.ItemDataRole.UserRole, i)
-            it.setData(ROLE_THUMB_PATH, thumb_path_for(t.path))
-            it.setData(ROLE_SUBTITLE, t.artist or "")
-            it.setData(ROLE_IS_HR, t.is_high_res())
-            self.list.addItem(it)
+        self.list.setUpdatesEnabled(False)
+        try:
+            self.list.clear()
+            self._index_items = {}
+            self._current_item = None
+            for i, t in enumerate(self._playlist.tracks):
+                it = QListWidgetItem(t.title or "")
+                it.setData(Qt.ItemDataRole.UserRole, i)
+                it.setData(ROLE_THUMB_PATH, thumb_path_for(t.path))
+                it.setData(ROLE_SUBTITLE, t.artist or "")
+                it.setData(ROLE_IS_HR, t.is_high_res())
+                self.list.addItem(it)
+                self._index_items[i] = it
+        finally:
+            self.list.setUpdatesEnabled(True)
         self.count_label.setText(tr("tracks_count", n=len(self._playlist)))
         self._highlight_current()
         self._apply_filter(self.search.text())
@@ -128,10 +141,12 @@ class QueuePanel(QWidget):
 
     def _highlight_current(self) -> None:
         current = self._playlist.current_index
-        for i in range(self.list.count()):
-            item = self.list.item(i)
-            idx = item.data(Qt.ItemDataRole.UserRole)
-            item.setData(ROLE_IS_PLAYING, idx == current)
+        if self._current_item is not None:
+            self._current_item.setData(ROLE_IS_PLAYING, False)
+        item = self._index_items.get(current)
+        if item is not None:
+            item.setData(ROLE_IS_PLAYING, True)
+        self._current_item = item
 
     def _on_current_changed(self, _index: int) -> None:
         self._highlight_current()
@@ -141,12 +156,9 @@ class QueuePanel(QWidget):
         current = self._playlist.current_index
         if current < 0:
             return
-        for i in range(self.list.count()):
-            if self.list.item(i).data(Qt.ItemDataRole.UserRole) == current:
-                self.list.scrollToItem(
-                    self.list.item(i), QListWidget.ScrollHint.PositionAtCenter
-                )
-                break
+        item = self._index_items.get(current)
+        if item is not None:
+            self.list.scrollToItem(item, QListWidget.ScrollHint.PositionAtCenter)
 
     # ------------------------------------------------------------------
     # 交互
@@ -172,7 +184,10 @@ class QueuePanel(QWidget):
 
     def _delete_selected(self) -> None:
         items = self.list.selectedItems()
-        idxs = sorted([it.data(Qt.ItemDataRole.UserRole) for it in items], reverse=True)
+        idxs = sorted(
+            [idx for idx in (it.data(Qt.ItemDataRole.UserRole) for it in items) if isinstance(idx, int)],
+            reverse=True,
+        )
         for i in idxs:
             self.remove_requested.emit(i)
 
@@ -191,8 +206,12 @@ class QueuePanel(QWidget):
                 item.setHidden(False)
                 continue
             idx = item.data(Qt.ItemDataRole.UserRole)
+            if not isinstance(idx, int):
+                item.setHidden(True)
+                continue
             t = self._playlist.get(idx)
             if t is None:
+                item.setHidden(True)
                 continue
             hay = f"{t.title} {t.artist} {t.album} {t.filename}".lower()
             item.setHidden(text not in hay)

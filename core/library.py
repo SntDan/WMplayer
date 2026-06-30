@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from typing import Dict, List, Optional
 
 from PyQt6.QtCore import QObject, QRunnable, QThreadPool, pyqtSignal
@@ -99,6 +100,8 @@ class _ScanRunnable(QRunnable):
 
             if (i + 1) % 25 == 0 or (i + 1) == total:
                 self._signals.progress.emit(i + 1, total)
+            if (i + 1) % 10 == 0:
+                time.sleep(0.001)
 
         # 排序:歌名首字母(忽略大小写),并列时再用艺术家做次序
         results.sort(key=lambda t: (
