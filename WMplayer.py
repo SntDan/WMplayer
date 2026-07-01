@@ -1,23 +1,31 @@
-"""
-程序入口
-========
-运行方式:
-  python WMplayer.py
-"""
+"""Application entry point."""
 
 from __future__ import annotations
 
 import os
 import sys
 
-# 把脚本所在目录(即 WMplayer/)放到 sys.path 最前面,
-# 这样 `import core` / `import ui` 在任何启动方式下都能找到。
+# Put the project directory first so `core` and `ui` imports work
+# regardless of how the app is launched.
 _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 
+def _set_windows_app_id() -> None:
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("WMplayer.WMplayer")
+    except Exception:
+        pass
+
+
 def main() -> int:
+    _set_windows_app_id()
+
     from PyQt6.QtWidgets import QApplication
     from ui.main_window import MainWindow
 

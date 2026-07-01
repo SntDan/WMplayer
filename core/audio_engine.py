@@ -56,6 +56,8 @@ class _MpvIpcProcess:
         if sys.platform == "win32":
             args.append("--ao=wasapi")
             args.append("--priority=abovenormal")
+            args.append("--media-controls=no")
+            args.append("--input-media-keys=no")
 
         if sys.platform == "win32" and hasattr(subprocess, "ABOVE_NORMAL_PRIORITY_CLASS"):
             creationflags |= subprocess.ABOVE_NORMAL_PRIORITY_CLASS
