@@ -1,10 +1,4 @@
-"""
-歌词视图
-========
-两种模式:
-- 同步歌词(LRC 带时间戳): 自动滚动到当前行,高亮当前行,点击跳转
-- 纯文本歌词或无时间戳:    手动滚动(滚轮 / 拖动),不高亮、不跳转
-"""
+"""Lyrics display panel."""
 
 from __future__ import annotations
 
@@ -37,51 +31,37 @@ LYRIC_TEXT_CLIP_PAD = 3
 
 
 class _LyricsCanvas(QWidget):
-    """实际绘制歌词的画布。"""
+    """Canvas for lyric rendering."""
 
-    line_clicked = pyqtSignal(int)  # 仅同步歌词:用户点击某行 -> 跳转
+    line_clicked = pyqtSignal(int)
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._lyrics: Optional[Lyrics] = None
         self._current_index: int = -1
         self._synced: bool = False
-        # 滚动偏移(像素)。同步模式由动画控制,手动模式由用户操作控制
         self._scroll: float = 0.0
-        # 缓动动画(只在同步模式用)
         self._anim = QPropertyAnimation(self, b"scroll")
         self._anim.setDuration(180)
         self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
-        # 字号
         self._font = QFont()
         self._font.setPointSize(13)
         self._font_active = QFont()
         self._font_active.setPointSize(17)
         self._font_active.setBold(True)
-        # 每个逻辑行之间的额外间距(单行情况下基础间距,多行情况下行间额外加这么多)
         self._row_gap = 14
-        # 文字两侧内边距(避免顶到面板边缘)
         self._text_margin = 24
 
-        # 高度缓存:_block_height/_block_top 是 hot path,200+ 行歌词逐帧计算
-        # 累加是 O(n²),用累计偏移表把 _block_top 降到 O(1)。
-        # _heights[i] = 第 i 行的高度;_offsets[i] = 第 0..i-1 行高度的累计和。
-        # _height_cache_key 记录 (lyrics 引用, 当前行 idx, 画布宽度) 三元组,
-        # 任一项变化时整张表重建。
         self._heights: list[float] = []
         self._offsets: list[float] = []
         self._total_height: float = 0.0
         self._height_cache_key: tuple = (None, -1, -1)
 
-        # 拖动状态
         self._drag_start_y: Optional[float] = None
         self._drag_start_scroll: float = 0.0
 
         self.setMinimumHeight(200)
 
-    # ------------------------------------------------------------------
-    # Qt property: scroll  (用于动画)
-    # ------------------------------------------------------------------
     def _get_scroll(self) -> float:
         return self._scroll
 
@@ -91,9 +71,6 @@ class _LyricsCanvas(QWidget):
 
     scroll = pyqtProperty(float, fget=_get_scroll, fset=_set_scroll)
 
-    # ------------------------------------------------------------------
-    # 公开接口
-    # ------------------------------------------------------------------
     def set_lyrics(self, lyrics: Optional[Lyrics]) -> None:
         self._lyrics = lyrics
         self._current_index = -1
@@ -104,7 +81,6 @@ class _LyricsCanvas(QWidget):
         self._total_height = 0.0
         self._anim.stop()
         self._synced = bool(lyrics and lyrics.is_synced())
-        # 同步模式 → 手指针,提示可点击;非同步 → 拖动手势,提示可拖
         if self._synced:
             self.setCursor(Qt.CursorShape.PointingHandCursor)
         elif self._lyrics and len(self._lyrics) > 0:
@@ -114,7 +90,6 @@ class _LyricsCanvas(QWidget):
         self.update()
 
     def set_current_index(self, index: int, animate: bool = True) -> None:
-        # 仅同步模式响应位置更新
         if not self._synced:
             return
         if index == self._current_index:
@@ -134,14 +109,11 @@ class _LyricsCanvas(QWidget):
             self._set_scroll(target)
         self.update()
 
-    # ------------------------------------------------------------------
-    # 几何计算 (按当前画布宽度自动换行)
-    # ------------------------------------------------------------------
     def _font_for(self, index: int) -> QFont:
         return self._font_active if (self._synced and index == self._current_index) else self._font
 
     def _ensure_heights(self) -> None:
-        """按需重建累计高度表;只在 (lyrics, current_index, width) 三者改变时执行。"""
+        """Refresh cached lyric layout when inputs change."""
         key = (id(self._lyrics) if self._lyrics else None, self._current_index, self.width())
         if key == self._height_cache_key:
             return
@@ -183,9 +155,6 @@ class _LyricsCanvas(QWidget):
             return self._offsets[index]
         return 0.0
 
-    # ------------------------------------------------------------------
-    # 绘制
-    # ------------------------------------------------------------------
     def paintEvent(self, _e) -> None:
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -204,8 +173,6 @@ class _LyricsCanvas(QWidget):
             p.end()
             return
 
-        # 同步模式:把当前行的中点定位到画布中心
-        # 手动模式:从顶部 30px 处开始铺
         if self._synced:
             origin_y = center_y
         else:
@@ -214,17 +181,14 @@ class _LyricsCanvas(QWidget):
         max_w = max(50, w - 2 * self._text_margin)
         flags = int(Qt.TextFlag.TextWordWrap) | int(Qt.AlignmentFlag.AlignHCenter)
 
-        # 累加 y,只绘制视区内的行
         y_top = origin_y - self._scroll
         for i, line in enumerate(self._lyrics.lines):
             block_h = self._block_height(i)
             text = line.text
             if not text:
-                # 安全防线:理论上 lrc 解析时已经丢空行
                 y_top += block_h
                 continue
 
-            # 视区裁剪
             if y_top + block_h < 0:
                 y_top += block_h
                 continue
@@ -244,7 +208,6 @@ class _LyricsCanvas(QWidget):
                     alpha = 200
                 p.setPen(QColor(255, 255, 255, alpha))
 
-            # 把整个 block 矩形传给 drawText,自动换行 + 居中
             text_h = block_h - self._row_gap
             rect = QRect(
                 self._text_margin,
@@ -257,17 +220,13 @@ class _LyricsCanvas(QWidget):
             y_top += block_h
         p.end()
 
-    # ------------------------------------------------------------------
-    # 鼠标交互
-    # ------------------------------------------------------------------
     def mousePressEvent(self, e):  # noqa: N802
         if self._lyrics is None:
             return
         if e.button() != Qt.MouseButton.LeftButton:
             return
         if self._synced:
-            return  # 同步模式下,不在 press 时处理 - 等 release 判断是点击还是拖动
-        # 手动模式:开始拖动
+            return
         self._drag_start_y = e.position().y()
         self._drag_start_scroll = self._scroll
         self.setCursor(Qt.CursorShape.ClosedHandCursor)
@@ -284,19 +243,15 @@ class _LyricsCanvas(QWidget):
         if self._lyrics is None:
             return
         if self._drag_start_y is not None:
-            # 手动模式拖动结束
             moved = abs(e.position().y() - self._drag_start_y) > 4
             self._drag_start_y = None
             self.setCursor(Qt.CursorShape.OpenHandCursor)
             if moved:
                 return
-            # 否则当作普通点击;但手动模式不响应点击跳转
             return
-        # 同步模式:点击跳转
         if self._synced:
             origin_y = self.height() / 2
             clicked_y = e.position().y() - origin_y + self._scroll
-            # 在每个 block 的累计 y 范围内找
             y_acc = 0.0
             for i in range(len(self._lyrics)):
                 bh = self._block_height(i)
@@ -306,11 +261,10 @@ class _LyricsCanvas(QWidget):
                 y_acc += bh
 
     def wheelEvent(self, e):  # noqa: N802
-        # 手动模式下用滚轮滚动;同步模式让事件继续传播(用户应靠音乐进度)
         if self._synced or self._lyrics is None:
             super().wheelEvent(e)
             return
-        delta = e.angleDelta().y()  # 一格通常是 120
+        delta = e.angleDelta().y()
         self._set_scroll(self._scroll - delta * 0.5)
         self._clamp_scroll()
         e.accept()
@@ -329,7 +283,7 @@ class _LyricsCanvas(QWidget):
 
 
 class LyricsPanel(QWidget):
-    """右侧歌词视图。"""
+    """Lyrics panel."""
 
     seek_to_ms = pyqtSignal(int)
 
@@ -372,7 +326,7 @@ class LyricsPanel(QWidget):
         if self._lyrics is None or len(self._lyrics) == 0:
             return
         if not self._lyrics.is_synced():
-            return  # 纯文本不跟随
+            return
         idx = self._lyrics.index_at(position_ms + LYRIC_VISUAL_LEAD_MS)
         self.canvas.set_current_index(idx)
 

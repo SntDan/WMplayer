@@ -1,10 +1,4 @@
-"""
-设置对话框
-==========
-- 曲库:默认目录(只读、置顶) + 用户自定义文件夹
-- 歌单:默认目录(只读、置顶) + 用户自定义文件夹/单独 .m3u8 文件
-- 通用: 音量、自动恢复、恢复出厂
-"""
+"""Settings dialog."""
 
 from __future__ import annotations
 
@@ -50,7 +44,7 @@ _LOCKED_DEFAULT_QSS = (
 
 
 def _make_default_label(prefix: str, path: str) -> QLabel:
-    """构造一个灰色、不可改的"默认目录"提示行。"""
+    """Create a disabled default-path label."""
     lbl = QLabel(f"{prefix} {path}")
     lbl.setStyleSheet(_LOCKED_DEFAULT_QSS)
     lbl.setToolTip(tr("default_dir_tooltip"))
@@ -74,7 +68,6 @@ class SettingsDialog(QDialog):
         tabs.addTab(self._build_general_tab(), tr("general"))
         layout.addWidget(tabs, 1)
 
-        # 关于
         about = QLabel(
             tr("about")
         )
@@ -86,21 +79,16 @@ class SettingsDialog(QDialog):
         )
         btns.accepted.connect(self.accept)
         btns.rejected.connect(self.reject)
-        # 把 OK / Cancel 做成跟右侧页"返回"按钮一致的红色主操作按钮形状
         for b in btns.buttons():
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setStyleSheet(_PRIMARY_BTN_QSS)
         layout.addWidget(btns)
 
-    # ------------------------------------------------------------------
-    # 曲库 tab
-    # ------------------------------------------------------------------
     def _build_library_tab(self) -> QWidget:
         w = QWidget()
         v = QVBoxLayout(w)
         v.setSpacing(8)
 
-        # 默认目录(置顶、灰色、不可改)
         v.addWidget(_make_default_label(tr("default_dir"), default_library_dir()))
 
         v.addWidget(QLabel(tr("other_library_dirs")))
@@ -131,14 +119,10 @@ class SettingsDialog(QDialog):
             return
         if self._list_contains(self.lst_folders, folder):
             return
-        # 默认目录已经隐式包含了
         if os.path.abspath(folder) == os.path.abspath(default_library_dir()):
             return
         self.lst_folders.addItem(folder)
 
-    # ------------------------------------------------------------------
-    # 歌单 tab
-    # ------------------------------------------------------------------
     def _build_playlists_tab(self) -> QWidget:
         w = QWidget()
         v = QVBoxLayout(w)
@@ -181,7 +165,7 @@ class SettingsDialog(QDialog):
             return
         ap = os.path.abspath(loc)
         if ap == os.path.abspath(default_playlists_dir()):
-            return  # 默认目录隐式包含
+            return
         if self._list_contains(self.lst_playlist_locs, ap, by_data=True):
             return
         it = QListWidgetItem(f"{ap}")
@@ -200,9 +184,6 @@ class SettingsDialog(QDialog):
         if path:
             self._add_playlist_location_item(path)
 
-    # ------------------------------------------------------------------
-    # 通用 tab
-    # ------------------------------------------------------------------
     def _build_general_tab(self) -> QWidget:
         w = QWidget()
         v = QVBoxLayout(w)
@@ -272,7 +253,6 @@ class SettingsDialog(QDialog):
             except Exception:
                 pass
 
-        # 清空整个缩略图目录
         try:
             if os.path.isdir(THUMB_DIR):
                 import shutil
@@ -284,13 +264,9 @@ class SettingsDialog(QDialog):
             self._config.set(key, value)
         self._config.save()
 
-        # 告知 closeEvent 跳过状态保存，避免队列文件被重新写入
         self._config.mark_factory_reset()
         QApplication.instance().quit()
 
-    # ------------------------------------------------------------------
-    # 通用列表辅助
-    # ------------------------------------------------------------------
     @staticmethod
     def _list_contains(lst: QListWidget, value: str, by_data: bool = False) -> bool:
         target = os.path.abspath(value)
@@ -306,9 +282,6 @@ class SettingsDialog(QDialog):
         for it in lst.selectedItems():
             lst.takeItem(lst.row(it))
 
-    # ------------------------------------------------------------------
-    # 收尾
-    # ------------------------------------------------------------------
     def collected_library_folders(self) -> List[str]:
         return [self.lst_folders.item(i).text() for i in range(self.lst_folders.count())]
 

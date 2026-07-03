@@ -1,17 +1,4 @@
-"""
-主窗口
-======
-把音频引擎 / 曲库 / 歌单 / 播放队列 / UI 全部连起来。
-
-右侧视图(QStackedWidget)切换:
-  0  曲库 (LibraryPanel)
-  1  歌手 (ArtistsPanel)
-  2  专辑 (AlbumsPanel)
-  3  播放队列 (QueuePanel)
-  4  歌词 (LyricsPanel)
-  5  歌单 (PlaylistsPanel)
-顶部 segmented control 与左下三个红色图标(书 / 返回 / 文件夹)同步切换。
-"""
+"""Main application window and signal wiring."""
 
 from __future__ import annotations
 
@@ -20,7 +7,6 @@ import time
 from typing import List, Optional
 
 from PyQt6.QtCore import (
-    QByteArray,
     QObject,
     QSize,
     QRunnable,
@@ -70,9 +56,6 @@ from .settings_dialog import SettingsDialog
 from .theme import GLOBAL_QSS
 
 
-# ----------------------------------------------------------------------
-# 后台读封面任务
-# ----------------------------------------------------------------------
 class _CoverSignals(QObject):
     done = pyqtSignal(str, object)  # (path, bytes_or_None)
 
@@ -96,9 +79,6 @@ class _CoverFetcher(QRunnable):
             pass
 
 
-# ----------------------------------------------------------------------
-# 右侧 segmented control
-# ----------------------------------------------------------------------
 class _MediaKeyHook(QObject):
     command = pyqtSignal(int)
 
@@ -171,7 +151,7 @@ class _MediaKeyHook(QObject):
 
 
 class _Segmented(QWidget):
-    """顶部右侧视图切换。"""
+    """Right-side tab bar."""
 
     changed = pyqtSignal(int)
 
@@ -193,7 +173,7 @@ class _Segmented(QWidget):
             h.addWidget(b)
         h.addStretch(1)
         self._group.idClicked.connect(self.changed.emit)
-        self.set_index(3)  # 默认 队列
+        self.set_index(3)
 
     def set_index(self, idx: int) -> None:
         btn = self._group.button(idx)
@@ -223,10 +203,6 @@ QPushButton:checked {
 }
 """
 
-
-# ----------------------------------------------------------------------
-# 主窗口
-# ----------------------------------------------------------------------
 class MainWindow(QMainWindow):
 
     VIEW_LIBRARY = 0
@@ -239,19 +215,12 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("WMplayer")
-        # 默认 = 最小: 此尺寸下 left=right=491px (player_panel 在 h=760 下的自然宽度)。
-        # 不允许再缩, 防止右侧视图被挤窄于左侧封面。
         self.setMinimumSize(QSize(983, 760))
         self.resize(QSize(983, 760))
         self.setStyleSheet(GLOBAL_QSS)
         self._config = Config()
         set_language(str(self._config.get("language", "en")))
 
-        # 跨屏(尤其是不同 DPI 屏)拖动还原: Qt 默认在 DPI 变化时按"物理像素守恒"
-        # 重设窗口几何, 导致 logical (DIP) 尺寸跟着变 -- 用户从"最小"状态拖过去
-        # 窗口就放大了。用一个 debounced 计时器记录用户"稳定"过的尺寸 (resize
-        # 停下 120ms 之后才提交), 跨屏时还原到这个尺寸。screenChanged 信号要等
-        # windowHandle() 真正存在 (即首次 show 之后) 才能接, 所以放在 showEvent 里。
         self._stable_size: QSize = QSize(983, 760)
         self._stable_timer = QTimer(self)
         self._stable_timer.setSingleShot(True)
@@ -261,9 +230,8 @@ class MainWindow(QMainWindow):
         self._last_media_command: tuple[int, float] = (-1, 0.0)
         self._media_key_hook = _MediaKeyHook(self)
 
-        # ------- 数据模型 -------
         self._engine = AudioEngine(self)
-        self._playlist = Playlist(self)              # 当前播放队列
+        self._playlist = Playlist(self)
         self._library = Library(LIBRARY_CACHE_PATH, self)
         self._library.set_folders(self._config.library_folders_effective())
         self._store = PlaylistStore(default_playlists_dir(), self)
@@ -278,14 +246,10 @@ class MainWindow(QMainWindow):
 
         self._autoplay_after_load = True
 
-        # ------- UI -------
         self._build_ui()
         self._wire()
         self._restore_state()
 
-    # ==================================================================
-    # UI 构建
-    # ==================================================================
     def _build_ui(self) -> None:
         central = QWidget(self)
         self.setCentralWidget(central)
@@ -293,16 +257,13 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # 左:播放器(宽度由它自己锁定,跟随窗口高度)
         self.player_panel = PlayerPanel()
 
-        # 中间分隔线
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.NoFrame)
         sep.setStyleSheet("background-color: #333333; border: none;")
         sep.setFixedWidth(1)
 
-        # 右:segmented + stacked
         right = QWidget()
         self.right_panel = right
         rv = QVBoxLayout(right)
@@ -328,17 +289,15 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentIndex(self.VIEW_QUEUE)
         rv.addWidget(self.stack, 1)
 
-        layout.addWidget(self.player_panel, 0)   # 不 stretch,宽度自锁
+        layout.addWidget(self.player_panel, 0)
         layout.addWidget(sep, 0)
-        layout.addWidget(right, 1)               # 最小宽度 = 左侧,多余宽度全部吃掉
+        layout.addWidget(right, 1)
 
     def _wire(self) -> None:
         self._media_key_hook.command.connect(self._handle_media_app_command)
 
-        # 顶部 segmented ↔ stack
         self.segmented.changed.connect(self._switch_view)
 
-        # 左侧播放面板
         pp = self.player_panel
         pp.play_pause_clicked.connect(self._toggle_play)
         pp.prev_clicked.connect(self._play_prev)
@@ -352,9 +311,6 @@ class MainWindow(QMainWindow):
         pp.settings_clicked.connect(self._on_settings)
         pp.artist_double_clicked.connect(self._on_player_artist_double_clicked)
         pp.album_double_clicked.connect(self._on_player_album_double_clicked)
-        pp.width_locked.connect(self._on_player_width_locked)
-
-        # 引擎事件
         self._engine.position_changed.connect(self.player_panel.set_position)
         self._engine.position_changed.connect(self.lyrics_panel.update_position)
         self._engine.duration_changed.connect(self._on_duration_changed)
@@ -365,7 +321,6 @@ class MainWindow(QMainWindow):
             lambda msg: self.statusBar().showMessage(tr("error_status", msg=msg), 4000)
         )
 
-        # 队列模型
         self._playlist.current_changed.connect(self._on_current_changed)
         self._playlist.changed.connect(self._on_playlist_changed)
         self._playlist.shuffled_changed.connect(self.player_panel.set_shuffled)
@@ -373,13 +328,11 @@ class MainWindow(QMainWindow):
         self._playlist.shuffled_changed.connect(lambda _shuffled: self._preload_next_track())
         self._playlist.repeat_changed.connect(lambda _repeat: self._preload_next_track())
 
-        # 队列视图
         self.queue_panel.track_double_clicked.connect(self._play_index)
         self.queue_panel.remove_requested.connect(self._on_remove_track)
         self.queue_panel.clear_requested.connect(self._on_clear_queue)
         self.queue_panel.save_as_playlist_requested.connect(self._on_save_queue_as_playlist)
 
-        # 曲库视图
         self.library_panel.play_paths_now.connect(self._play_paths_now)
         self.library_panel.enqueue_paths.connect(self._enqueue_paths)
         self.library_panel.add_paths_to_playlist.connect(self._add_paths_to_some_playlist)
@@ -387,28 +340,23 @@ class MainWindow(QMainWindow):
         self.library_panel.open_album_requested.connect(self._open_album_from_search)
         self.library_panel.rescan_requested.connect(self._rescan_library)
 
-        # 专辑视图
         self.albums_panel.play_paths_now.connect(self._play_paths_now)
         self.albums_panel.play_paths_sequential.connect(self._play_paths_sequential_now)
         self.albums_panel.enqueue_paths.connect(self._enqueue_paths)
         self.albums_panel.add_paths_to_playlist.connect(self._add_paths_to_some_playlist)
 
-        # 歌手视图
         self.artists_panel.play_paths_now.connect(self._play_paths_now)
         self.artists_panel.play_paths_sequential.connect(self._play_paths_sequential_now)
         self.artists_panel.play_paths_shuffled.connect(self._play_paths_shuffled_now)
         self.artists_panel.enqueue_paths.connect(self._enqueue_paths)
         self.artists_panel.add_paths_to_playlist.connect(self._add_paths_to_some_playlist)
 
-        # 歌单视图
         self.playlists_panel.open_playlist.connect(self._on_open_playlist)
         self.playlists_panel.rename_playlist.connect(self._on_rename_playlist)
         self.playlists_panel.delete_playlist.connect(self._on_delete_playlist)
 
-        # 歌词视图:双击行 → 跳转
         self.lyrics_panel.seek_to_ms.connect(self._engine.seek)
 
-        # 全局快捷键
         def _sc(seq, fn):
             s = QShortcut(QKeySequence(seq), self); s.activated.connect(fn); return s
 
@@ -428,41 +376,31 @@ class MainWindow(QMainWindow):
             return True
         self._last_media_command = (command, now)
 
-        if command == 11:  # APPCOMMAND_MEDIA_NEXTTRACK
-            self._play_next()
-            return True
-        if command == 12:  # APPCOMMAND_MEDIA_PREVIOUSTRACK
-            self._play_prev()
-            return True
-        if command == 13:  # APPCOMMAND_MEDIA_STOP
-            self._engine.stop()
-            self.player_panel.set_playing(False)
-            return True
-        if command == 14:  # APPCOMMAND_MEDIA_PLAY_PAUSE
-            self._toggle_play()
-            return True
-        if command == 46:  # APPCOMMAND_MEDIA_PLAY
-            if not self._engine.is_playing():
-                self._toggle_play()
-            return True
-        if command == 47:  # APPCOMMAND_MEDIA_PAUSE
-            if self._engine.is_playing():
-                self._toggle_play()
-            return True
-        return False
+        handlers = {
+            11: self._play_next,
+            12: self._play_prev,
+            13: self._stop_from_media_key,
+            14: self._toggle_play,
+            46: self._play_from_media_key,
+            47: self._pause_from_media_key,
+        }
+        handler = handlers.get(command)
+        if handler is None:
+            return False
+        handler()
+        return True
 
-    def _on_player_width_locked(self, w: int) -> None:
-        # 故意保持空实现。曾经在这里把窗口的 minimumWidth 跟 player_panel 一起涨,
-        # 并在 resizeEvent 链上 self.resize(...), 但带来两个 bug:
-        #   1) Aero Snap 到全屏后, 窗口高度变大 → 面板宽变大 → 窗口 minimumWidth 被
-        #      永久抬高, 取消最大化时无法回到保存的小尺寸 (出现"特别大/特别长")。
-        #   2) 在 Windows 交互式拖角(尤其是左上角)时, self.resize 与 WM 抢窗口几何,
-        #      表现成拖不跟手 / 卡住。
-        # 现在依靠 __init__ 里 setMinimumSize(720,760) 提供静态下限, 以及 Qt 布局系统
-        # 根据子控件 (player_panel.setFixedWidth + 右侧 sizePolicy) 自动算出的自然
-        # 下限。player_panel 在自身 resizeEvent 里会随窗口高度自动重新计算并收缩,
-        # 因此窗口缩小时也会跟着缩, 形成稳定的多步收敛。
-        return
+    def _stop_from_media_key(self) -> None:
+        self._engine.stop()
+        self.player_panel.set_playing(False)
+
+    def _play_from_media_key(self) -> None:
+        if not self._engine.is_playing():
+            self._toggle_play()
+
+    def _pause_from_media_key(self) -> None:
+        if self._engine.is_playing():
+            self._toggle_play()
 
     def _on_player_artist_double_clicked(self) -> None:
         track = self._playlist.current
@@ -487,8 +425,7 @@ class MainWindow(QMainWindow):
     def _switch_view(self, idx: int) -> None:
         self.segmented.set_index(idx)
         self.stack.setCurrentIndex(idx)
-        
-        # 返回初始页面状态
+
         if idx == self.VIEW_ALBUMS:
             self.albums_panel.stack.setCurrentIndex(0)
         elif idx == self.VIEW_ARTISTS:
@@ -508,13 +445,8 @@ class MainWindow(QMainWindow):
             if callable(fn):
                 fn()
 
-    # ==================================================================
-    # 启动 / 关闭
-    # ==================================================================
     def _restore_state(self) -> None:
-        # 音量、模式
         self._engine.set_volume(int(self._config.get("volume", 80)))
-        # 优先用新版双字段; 缺失时从旧的 play_mode 转换
         if self._config.has("shuffled") or self._config.has("repeat"):
             try:
                 self._playlist.set_repeat(RepeatMode(self._config.get("repeat", "none")))
@@ -527,7 +459,6 @@ class MainWindow(QMainWindow):
             except Exception:
                 self._playlist.set_mode(PlayMode.SEQUENTIAL)
 
-        # 还原"上次播放队列"——保存在 queue.m3u8 和 queue_original.m3u8
         if os.path.isfile(QUEUE_CACHE_PATH):
             paths = m3u.parse_file(QUEUE_CACHE_PATH)
             original_paths: Optional[List[str]] = None
@@ -535,11 +466,9 @@ class MainWindow(QMainWindow):
                 original_paths = m3u.parse_file(QUEUE_ORIGINAL_CACHE_PATH)
 
             if paths:
-                # 优先用 library 缓存命中,只对未命中的路径回退到 read_metadata
                 tracks = self._tracks_from_paths(paths)
                 orig_tracks = self._tracks_from_paths(original_paths) if original_paths else None
                 self._playlist.restore_with_tracks(tracks, orig_tracks)
-                # 还原当前曲目
                 last = self._config.get("last_track_path", "")
                 if last:
                     idx = self._playlist.find_index_by_path(last)
@@ -551,7 +480,6 @@ class MainWindow(QMainWindow):
                             if pos > 0:
                                 self._engine.seek(pos)
 
-        # 启动时若曲库为空,且有可扫描根目录 → 自动扫一次
         if len(self._library) == 0 and self._library.folders:
             self._library.scan_async()
 
@@ -559,14 +487,11 @@ class MainWindow(QMainWindow):
         super().resizeEvent(e)
         if hasattr(self, "player_panel"):
             self.player_panel._lock_width_to_height()
-        # 防抖采集: 用户停止 resize 120ms 后才会真正写入 _stable_size。这样跨屏
-        # 时 Qt 自身那一两次自动 resize 不会污染我们记下的"用户期望尺寸"。
         if not self.isMaximized() and not self.isFullScreen():
             self._stable_timer.start()
 
     def showEvent(self, e):  # noqa: N802
         super().showEvent(e)
-        # windowHandle() 在首次 show 之后才有, 所以这里挂 screenChanged 监听。
         wh = self.windowHandle()
         if wh is not None and not self._screen_sig_wired:
             wh.screenChanged.connect(self._on_screen_changed)
@@ -577,18 +502,10 @@ class MainWindow(QMainWindow):
             self._stable_size = self.size()
 
     def _on_screen_changed(self, _screen) -> None:
-        """跨屏时强制让面板布局缓存失效 + 把窗口还原到用户最近稳定的尺寸。
-
-        Qt 在 DPI 切换时会按物理像素守恒重设几何, 进入新屏后:
-          - 字体度量可能变 -> player_panel 的 below_h 缓存失效
-          - logical 尺寸被改 -> 用户原本"在最小"的窗口就不再是最小了
-        这里都修掉。
-        """
+        """Refresh layout after a screen change."""
         pp = getattr(self, "player_panel", None)
         if pp is not None:
             pp._cached_below_h = None
-        # 让 Qt 把它自己的 DPI-resize 跑完, 再下一帧把尺寸还原回稳定值。
-        # 期间不要让 _stable_timer 把这些瞬态尺寸当成"用户期望"记下来。
         self._stable_timer.stop()
         QTimer.singleShot(0, self._restore_stable_size)
 
@@ -601,25 +518,20 @@ class MainWindow(QMainWindow):
         target_h = max(target.height(), self.minimumHeight())
         if self.size().width() != target_w or self.size().height() != target_h:
             self.resize(target_w, target_h)
-        # 还原完成 -- 重启 debounce, 把"还原后的尺寸"作为新的稳定基线。
         self._stable_timer.start()
 
     def closeEvent(self, e):  # noqa: N802
         if not self._config.factory_reset_pending:
             try:
                 self._config.set("volume", self._engine.get_volume())
-                # 新版双字段(主)
                 self._config.set("shuffled", self._playlist.shuffled)
                 self._config.set("repeat", self._playlist.repeat.value)
-                # 旧字段保留,这样降级也能凑合识别(可能损失 shuffled+repeat 同开的信息)
                 self._config.set("play_mode", self._playlist.mode.value)
                 self._config.set("last_position_ms", self._engine.get_position())
                 cur = self._playlist.current
                 self._config.set("last_track_path", cur.path if cur else "")
                 self._config.save()
-                # 保存当前队列为隐藏的 queue.m3u8
                 m3u.write_file(QUEUE_CACHE_PATH, "queue", self._playlist.paths)
-                # 保存由于随机播放之前的原始队列 (存在的话) 为 queue_original.m3u8
                 orig_paths = self._playlist.original_paths
                 if orig_paths is not None:
                     m3u.write_file(QUEUE_ORIGINAL_CACHE_PATH, "queue_original", orig_paths)
@@ -637,9 +549,6 @@ class MainWindow(QMainWindow):
             pass
         super().closeEvent(e)
 
-    # ==================================================================
-    # 播放控制
-    # ==================================================================
     def _toggle_play(self) -> None:
         if self._playlist.current_index < 0:
             if len(self._playlist) > 0:
@@ -697,19 +606,13 @@ class MainWindow(QMainWindow):
         self._preload_next_track()
 
     def _on_playlist_changed(self) -> None:
-        """队列结构变化(洗牌、恢复原顺序、删除其它项等)时调用。
-
-        只刷新左侧的"编号 / 总数"显示和进度条总长,绝不重新加载播放。
-        """
+        """Refresh queue-dependent UI without reloading playback."""
         cur = self._playlist.current
         idx = self._playlist.current_index
         total = len(self._playlist)
         if cur is None or idx < 0:
-            # 队列空或当前无选中:不动播放器面板
             self._engine.preload(None)
             return
-        # 复用 set_track,但因为播放/封面/歌词都没变,这里只更新文字和编号即可。
-        # set_track 内部会重置进度条和位置 → 不能用,我们自己写最小更新。
         self.player_panel.lbl_index.setText(f"{idx + 1}/{total}")
         self._preload_next_track()
 
@@ -726,7 +629,7 @@ class MainWindow(QMainWindow):
         self._fetch_cover_async(track.path)
 
     def _load_lyrics_for(self, audio_path: str) -> None:
-        """根据音频路径找同名 .lrc,加载到歌词面板。"""
+        """Load lyrics for an audio path."""
         lrc_path = lrc_mod.find_lrc_for(audio_path)
         lyr = lrc_mod.parse_file(lrc_path) if lrc_path else None
         cur = self._playlist.current
@@ -734,7 +637,6 @@ class MainWindow(QMainWindow):
         if cur is not None:
             label = f"{cur.title} - {cur.artist}"
         self.lyrics_panel.set_lyrics(lyr, track_label=label)
-        # 更新左上角"歌词"按钮的灰/白状态
         self.player_panel.set_lyrics_available(self.lyrics_panel.has_lyrics())
 
     def _on_duration_changed(self, ms: int) -> None:
@@ -746,9 +648,6 @@ class MainWindow(QMainWindow):
     def _on_state_changed(self, state: str) -> None:
         self.player_panel.set_playing(state == "playing")
 
-    # ==================================================================
-    # 封面后台读取
-    # ==================================================================
     def _remember_cover(self, path: str, cover: Optional[bytes]) -> None:
         self._cover_cache[path] = cover
         while len(self._cover_cache) > self._cover_cache_limit:
@@ -787,14 +686,10 @@ class MainWindow(QMainWindow):
             cur.cover = cover
             self.player_panel.cover.set_cover(cover)
 
-    # ==================================================================
-    # 队列操作
-    # ==================================================================
     def _on_remove_track(self, index: int) -> None:
         was_current = (index == self._playlist.current_index)
         self._playlist.remove(index)
         if was_current:
-            # 队列还有曲目就自动播下一首(原 index 位置变成下一首),否则停止
             if len(self._playlist) > 0:
                 next_idx = min(index, len(self._playlist) - 1)
                 self._play_index(next_idx)
@@ -825,11 +720,8 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.warning(self, tr("save_failed_title"), tr("save_failed_msg"))
 
-    # ==================================================================
-    # 曲库操作
-    # ==================================================================
     def _tracks_from_paths(self, paths):
-        """优先命中曲库缓存;未命中再用 read_metadata 兜底,避免大量同步读盘。"""
+        """Resolve tracks from paths with cache fallback."""
         tracks = []
         for p in paths:
             if not p:
@@ -879,14 +771,12 @@ class MainWindow(QMainWindow):
             return
         names = self._store.list_names()
         if not names:
-            # 没有歌单,直接新建一个
             name, ok = QInputDialog.getText(self, tr("new_playlist"), tr("playlist_name"))
             if not (ok and name.strip()):
                 return
             self._store.save(name.strip(), paths)
             self.statusBar().showMessage(tr("create_playlist_status", name=name.strip(), n=len(paths)), 3000)
             return
-        # 让用户选一个现有歌单 或 新建
         new_label = f"<{tr('new_playlist')}>"
         names_with_new = [new_label] + names
         choice, ok = QInputDialog.getItem(
@@ -915,9 +805,6 @@ class MainWindow(QMainWindow):
         self._library.set_folders(self._config.library_folders_effective())
         self._library.scan_async()
 
-    # ==================================================================
-    # 歌单操作
-    # ==================================================================
     def _on_open_playlist(self, name: str) -> None:
         paths = self._store.load(name)
         if not paths:
@@ -946,18 +833,13 @@ class MainWindow(QMainWindow):
             return
         self._store.delete(name)
 
-    # ==================================================================
-    # 设置
-    # ==================================================================
     def _on_settings(self) -> None:
         dlg = SettingsDialog(self._config, self)
         if dlg.exec():
             dlg.apply_to_config()
-            # 把变更应用到运行中的对象
             self._engine.set_volume(int(self._config.get("volume", 80)))
             set_language(str(self._config.get("language", "en")))
             self._retranslate_ui()
             self._library.set_folders(self._config.library_folders_effective())
             self._store.set_locations(self._config.playlist_locations_effective())
-            # 应用后自动重扫
             self._library.scan_async()

@@ -1,14 +1,4 @@
-"""
-曲库
-====
-管理多个根目录,扫描出全部音频文件并缓存元数据(标题/艺术家/专辑)。
-
-设计要点:
-- 扫描在工作线程跑,通过信号汇报进度,主线程不卡
-- 缓存到 library_cache.json,启动秒加载
-- 增量扫描:文件 mtime 没变就直接复用缓存的元数据
-- 不预读封面,封面只在播放时按需取
-"""
+"""Music library scanning and metadata cache."""
 
 from __future__ import annotations
 
@@ -23,9 +13,6 @@ from core.metadata import TrackMetadata, is_supported, read_metadata
 from core.thumbnails import ensure_thumb, thumb_exists
 
 
-# ----------------------------------------------------------------------
-# 后台扫描
-# ----------------------------------------------------------------------
 class _ScanSignals(QObject):
     progress = pyqtSignal(int, int)          # done, total
     finished = pyqtSignal(list)              # List[TrackMetadata]
@@ -44,7 +31,6 @@ class _ScanRunnable(QRunnable):
         self._signals = signals
 
     def run(self) -> None:
-        # 1) 收集所有候选文件
         files: List[str] = []
         seen = set()
         for folder in self._folders:
@@ -59,7 +45,6 @@ class _ScanRunnable(QRunnable):
                         seen.add(p)
                         files.append(p)
 
-        # 2) 对每个文件:缓存有效就跳过 read_metadata
         results: List[TrackMetadata] = []
         total = len(files)
         for i, path in enumerate(files):
@@ -103,7 +88,6 @@ class _ScanRunnable(QRunnable):
             if (i + 1) % 10 == 0:
                 time.sleep(0.001)
 
-        # 排序:歌名首字母(忽略大小写),并列时再用艺术家做次序
         results.sort(key=lambda t: (
             (t.title or "").lower(),
             (t.artist or "").lower(),
@@ -111,9 +95,6 @@ class _ScanRunnable(QRunnable):
         self._signals.finished.emit(results)
 
 
-# ----------------------------------------------------------------------
-# Library 主体
-# ----------------------------------------------------------------------
 class Library(QObject):
 
     folders_changed = pyqtSignal()
@@ -126,24 +107,16 @@ class Library(QObject):
         super().__init__(parent)
         self._cache_path = cache_path
         self._folders: List[str] = []
-        # _tracks 是磁盘上的全量曲目 (用于 path 查找/缓存持久化),
-        # _display_tracks 是按 (歌名/歌手/专辑) 去重后只保留最高规格的视图,
-        # 暴露给 UI; 队列里若引用了被去重掉的路径, find_by_path 仍能命中。
         self._tracks: List[TrackMetadata] = []
         self._display_tracks: List[TrackMetadata] = []
         self._path_map: Optional[Dict[str, TrackMetadata]] = None
         self._scanning = False
-        # 扫描信号(单实例,长期存在,与 worker 安全跨线程通信)
         self._signals = _ScanSignals(self)
         self._signals.progress.connect(self.scan_progress.emit)
         self._signals.finished.connect(self._on_scan_finished)
-        # 启动加载缓存
         self._load_cache()
         self._rebuild_display()
 
-    # ------------------------------------------------------------------
-    # 数据访问
-    # ------------------------------------------------------------------
     @property
     def folders(self) -> List[str]:
         return list(self._folders)
@@ -161,7 +134,7 @@ class Library(QObject):
         return self._path_map.get(path)
 
     def _rebuild_display(self) -> None:
-        """同名同歌手同专辑只保留规格最高的一条。"""
+        """Build the deduplicated library view."""
         best: Dict[tuple, TrackMetadata] = {}
         order: List[tuple] = []
         for t in self._tracks:
@@ -188,11 +161,7 @@ class Library(QObject):
             or q in (t.album or "").lower()
         ]
 
-    # ------------------------------------------------------------------
-    # 文件夹管理
-    # ------------------------------------------------------------------
     def set_folders(self, folders: List[str]) -> None:
-        # 去重并保持原顺序
         cleaned: List[str] = []
         seen = set()
         for f in folders:
@@ -222,9 +191,6 @@ class Library(QObject):
             self._folders.remove(folder)
             self.folders_changed.emit()
 
-    # ------------------------------------------------------------------
-    # 扫描
-    # ------------------------------------------------------------------
     def is_scanning(self) -> bool:
         return self._scanning
 
@@ -239,16 +205,13 @@ class Library(QObject):
 
     def _on_scan_finished(self, tracks) -> None:
         self._tracks = list(tracks)
-        self._path_map = None  # 失效旧的 path 索引
+        self._path_map = None  # Invalidate the path index.
         self._rebuild_display()
         self._scanning = False
         self._save_cache()
         self.tracks_changed.emit()
         self.scan_finished.emit()
 
-    # ------------------------------------------------------------------
-    # 缓存持久化
-    # ------------------------------------------------------------------
     def _build_cache_dict(self) -> Dict[str, dict]:
         cache: Dict[str, dict] = {}
         for t in self._tracks:
@@ -312,7 +275,6 @@ class Library(QObject):
                     for t in self._tracks
                 ],
             }
-            # 原子写: 先写 .tmp 再 os.replace,避免崩溃留下半截 JSON
             tmp = self._cache_path + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False)
@@ -329,7 +291,7 @@ def _safe_mtime(path: str) -> float:
 
 
 def _spec_score(t: TrackMetadata) -> tuple:
-    """规格越高分数越大: 先看是否 HR, 再看位深 / 采样率 / 时长。"""
+    """Return a quality score used for duplicate selection."""
     return (
         1 if t.is_high_res() else 0,
         t.bits_per_sample or 0,

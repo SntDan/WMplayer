@@ -80,7 +80,6 @@ class ArtistsPanel(QWidget):
         self._search_timer.setInterval(90)
         self._search_timer.timeout.connect(lambda: self._apply_filter(self.search_box.text()))
         self.search_box.textChanged.connect(lambda _text: self._search_timer.start())
-        # 单信号: 单击进入(避免双击触发两次重复加载)
         self.list_artists.itemClicked.connect(self._on_artist_clicked)
 
     def refresh(self) -> None:
@@ -91,7 +90,6 @@ class ArtistsPanel(QWidget):
                 self._artists_tracks[artist] = []
             self._artists_tracks[artist].append(t)
 
-        # 按照专辑排序，保证“一个一个专辑播放”
         for artist in self._artists_tracks:
             self._artists_tracks[artist].sort(key=lambda t: (t.album or "", t.title or ""))
 
@@ -103,9 +101,7 @@ class ArtistsPanel(QWidget):
             it = QListWidgetItem(a)
             it.setData(Qt.ItemDataRole.UserRole, a)
             if tracks:
-                # 用该歌手「首张专辑」首曲的封面缩略图
                 it.setData(ROLE_THUMB_PATH, thumb_path_for(tracks[0].path))
-                # 副标题: 该歌手有几张专辑
                 album_count = len({t.album for t in tracks})
                 it.setData(ROLE_SUBTITLE, tr("albums_count", n=album_count))
             self.list_artists.addItem(it)

@@ -1,10 +1,4 @@
-"""
-歌单视图
-========
-显示 playlists/ 目录下所有 .m3u8 歌单。
-- 双击 → 加载到播放队列(并播放第一首)
-- 右键: 重命名 / 删除
-"""
+"""Playlist browser panel."""
 
 from __future__ import annotations
 
@@ -32,7 +26,7 @@ from ui.list_delegates import CoverRowDelegate, ROLE_SUBTITLE, ROLE_THUMB_PATHS
 
 class PlaylistsPanel(QWidget):
 
-    open_playlist = pyqtSignal(str)         # 双击某个歌单 → 加载并播放
+    open_playlist = pyqtSignal(str)
     rename_playlist = pyqtSignal(str, str)  # (old, new)
     delete_playlist = pyqtSignal(str)
 
@@ -48,7 +42,6 @@ class PlaylistsPanel(QWidget):
         outer.setContentsMargins(20, 16, 20, 16)
         outer.setSpacing(10)
 
-        # 标题
         header = QHBoxLayout()
         self.title_label = QLabel(tr("playlists"))
         f = QFont(); f.setPointSize(15); f.setBold(True); self.title_label.setFont(f)
@@ -59,13 +52,11 @@ class PlaylistsPanel(QWidget):
         header.addWidget(self.count_label)
         outer.addLayout(header)
 
-        # 路径提示
         self.path_label = QLabel()
         self.path_label.setStyleSheet("color: #666; font-size: 11px;")
         self.path_label.setWordWrap(True)
         outer.addWidget(self.path_label)
 
-        # 列表
         self.list = QListWidget()
         self.list.setTextElideMode(Qt.TextElideMode.ElideRight)
         self.list.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)

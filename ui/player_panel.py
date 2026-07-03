@@ -1,8 +1,4 @@
-"""
-播放器面板(左半)
-================
-包含封面 / 进度条 / 标题艺术家专辑 / 三大键 / 模式键 / 底栏。
-"""
+"""Left-side playback panel."""
 
 from __future__ import annotations
 
@@ -13,15 +9,13 @@ from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
-    QSizePolicy,
     QSpacerItem,
     QVBoxLayout,
     QWidget,
 )
 
 from core.metadata import TrackMetadata
-from core.playlist import PlayMode, RepeatMode
-from .theme import Theme
+from core.playlist import RepeatMode
 from .widgets import (
     AlbumCover,
     CircleButton,
@@ -49,31 +43,27 @@ PLAYER_INFO_BOTTOM_GAP = 0
 PLAYER_TIME_POINT_SIZE = 12
 PLAYER_TIME_ROW_HEIGHT = 15
 PLAYER_TIME_PAINT_HEIGHT = 24
-PLAYER_TIME_TEXT_Y_OFFSET = -3
 PLAYER_LIBRARY_BUTTON_HEIGHT = 46
 PLAYER_LIBRARY_ICON_Y_OFFSET = 14
 PLAYER_HR_Y_OFFSET = 3
 
 
 class PlayerPanel(QWidget):
-    # 与外部交互的信号
     play_pause_clicked = pyqtSignal()
     prev_clicked = pyqtSignal()
     next_clicked = pyqtSignal()
     seek_requested = pyqtSignal(int)
-    shuffle_toggle_requested = pyqtSignal(bool)        # 用户希望切到的随机状态
-    repeat_change_requested = pyqtSignal(RepeatMode)   # 用户希望切到的循环模式
+    shuffle_toggle_requested = pyqtSignal(bool)
+    repeat_change_requested = pyqtSignal(RepeatMode)
     back_clicked = pyqtSignal()
     open_files_clicked = pyqtSignal()
     settings_clicked = pyqtSignal()
     library_clicked = pyqtSignal()
     artist_double_clicked = pyqtSignal()
     album_double_clicked = pyqtSignal()
-    width_locked = pyqtSignal(int)
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        # 缓存下方控件区的高度 sizeHint, 避免每次 resize 都重算 (拖动时每像素都触发)
         self._cached_below_h: Optional[int] = None
         self._build_ui()
         self._is_playing = False
@@ -83,34 +73,26 @@ class PlayerPanel(QWidget):
         self._info_scroll_direction = 1
         self._info_scroll_pause_ticks = 0
         self._refresh_mode_buttons()
-        # 三个滚动标签共享同一个计时器, 保证多行同步前进; 节奏比默认慢一点
         self._scroll_timer = QTimer(self)
         self._scroll_timer.setInterval(60)
         self._scroll_timer.timeout.connect(self._tick_scrolling_labels)
         self._scroll_timer.start()
 
-    # ------------------------------------------------------------------
-    # UI 构建
-    # ------------------------------------------------------------------
     def _build_ui(self) -> None:
-        # 外层垂直: 封面占 stretch=1, 下方所有控件塞进 _below 容器(高度由内容决定)
         self._margin = 24
         outer = QVBoxLayout(self)
         outer.setContentsMargins(self._margin, self._margin, self._margin, self._margin)
         outer.setSpacing(0)
 
-        # ---- 1. 封面 (paint 时按 1:1 居中绘制) ----
         self.cover = AlbumCover(self)
         outer.addWidget(self.cover, 1)
 
-        # ---- 下方区域: 一个独立 QWidget,容易测它的 sizeHint().height() ----
         self._below = QWidget(self)
         below = QVBoxLayout(self._below)
         below.setContentsMargins(0, 0, 0, 0)
         below.setSpacing(8)
         outer.addWidget(self._below, 0)
 
-        # ---- 2. 时间标签行: 与封面左/中/右对齐 ----
         labels_row = QHBoxLayout()
         labels_row.setContentsMargins(
             0,
@@ -133,7 +115,6 @@ class PlayerPanel(QWidget):
         labels_row.addWidget(self.lbl_index, 1)
         labels_row.addWidget(self.lbl_dur, 1)
 
-        # ---- 3. 进度条 ----
         self.progress = ProgressBar(self)
         self.progress.seek_requested.connect(self.seek_requested.emit)
 
@@ -146,9 +127,6 @@ class PlayerPanel(QWidget):
 
         below.addSpacerItem(QSpacerItem(0, PLAYER_INFO_TOP_GAP + 8))
 
-        # ---- 4. 歌曲信息 + 库按钮 + HR 徽章合并到同一行 ----
-        # 信息块 (歌名/歌手/专辑) 居中,左侧是库图标, 右侧是 HR 徽章。
-        # 这一整行就坐落在原 lib_row 的位置, 把空间利用起来, 视觉上整体下移。
         self.lbl_title = ScrollingLabel(self)
         self._set_info_label_font(self.lbl_title, PLAYER_INFO_TITLE_PX, bold=True)
         self.lbl_title.setText("Song")
@@ -176,14 +154,13 @@ class PlayerPanel(QWidget):
 
         self.btn_library = IconButton("library", size=32)
         self.btn_library.setFixedSize(QSize(32, PLAYER_LIBRARY_BUTTON_HEIGHT))
-        self.btn_library.setToolTip("歌词")
+        self.btn_library.setToolTip("Lyrics")
         self.btn_library.set_enabled_visual(False)
         self.btn_library.set_icon_y_offset(PLAYER_LIBRARY_ICON_Y_OFFSET)
         self.btn_library.clicked.connect(self.library_clicked.emit)
 
         self.hr_badge = HRBadge(self)
 
-        # HR 徽章外面包一层固定高度容器, 方便按像素上移。
         self._hr_badge_box = QWidget(self)
         self._hr_badge_box.setFixedHeight(PLAYER_INFO_HEIGHT)
         hr_layout = QVBoxLayout(self._hr_badge_box)
@@ -195,23 +172,20 @@ class PlayerPanel(QWidget):
         info_row = QHBoxLayout()
         info_row.setContentsMargins(0, 0, 0, 0)
         info_row.setSpacing(0)
-        # 库按钮固定在最左, 与信息块底部对齐
         info_row.addWidget(self.btn_library, 0, Qt.AlignmentFlag.AlignBottom)
         info_row.addStretch(1)
         info_row.addWidget(self._info_container, 0)
         info_row.addStretch(1)
-        # HR 徽章固定在最右, 通过 PLAYER_HR_Y_OFFSET 按像素上移
         info_row.addWidget(self._hr_badge_box, 0)
         below.addLayout(info_row)
         below.addSpacerItem(QSpacerItem(0, PLAYER_INFO_BOTTOM_GAP + 4))
 
-        # ---- 6. 主控制行: shuffle 最左 | prev | PLAY | next | repeat 最右 ----
         ctrl_row = QHBoxLayout()
         ctrl_row.setContentsMargins(0, 4, 0, 0)
         ctrl_row.setSpacing(0)
 
         self.btn_shuffle = IconButton("shuffle", size=32)
-        self.btn_shuffle.setToolTip("顺序 / 随机")
+        self.btn_shuffle.setToolTip("Shuffle")
         self.btn_shuffle.clicked.connect(self._on_shuffle_clicked)
 
         self.btn_prev = CircleButton("prev", size=52)
@@ -224,10 +198,9 @@ class PlayerPanel(QWidget):
         self.btn_next.clicked.connect(self.next_clicked.emit)
 
         self.btn_repeat = IconButton("repeat", size=32)
-        self.btn_repeat.setToolTip("循环模式")
+        self.btn_repeat.setToolTip("Repeat")
         self.btn_repeat.clicked.connect(self._on_repeat_clicked)
 
-        # shuffle 紧贴左边,repeat 紧贴右边,中间三大键自动居中
         ctrl_row.addWidget(self.btn_shuffle, 0, Qt.AlignmentFlag.AlignVCenter)
         ctrl_row.addStretch(1)
         ctrl_row.addWidget(self.btn_prev, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -241,20 +214,18 @@ class PlayerPanel(QWidget):
 
         below.addSpacerItem(QSpacerItem(0, 10))
 
-        # ---- 7. 底栏: 返回 / 文件 / 设置, 三等分 ----
         bottom_row = QHBoxLayout()
         bottom_row.setContentsMargins(0, 0, 0, 0)
         bottom_row.setSpacing(0)
         self.btn_back = IconButton("back", size=32)
-        self.btn_back.setToolTip("返回播放队列")
+        self.btn_back.setToolTip("Back to queue")
         self.btn_back.clicked.connect(self.back_clicked.emit)
         self.btn_files = IconButton("folder", size=32)
-        self.btn_files.setToolTip("曲库")
+        self.btn_files.setToolTip("Library")
         self.btn_files.clicked.connect(self.open_files_clicked.emit)
         self.btn_settings = IconButton("settings", size=32)
-        self.btn_settings.setToolTip("设置")
+        self.btn_settings.setToolTip("Settings")
         self.btn_settings.clicked.connect(self.settings_clicked.emit)
-        # 三个按钮均匀分布: 左 / 中 / 右
         bottom_row.addWidget(self.btn_back, 0, Qt.AlignmentFlag.AlignLeft)
         bottom_row.addStretch(1)
         bottom_row.addWidget(self.btn_files, 0, Qt.AlignmentFlag.AlignCenter)
@@ -277,9 +248,6 @@ class PlayerPanel(QWidget):
         weight = "700" if bold else "400"
         label.setStyleSheet(f"color: {color}; font-size: {pixel_size}px; font-weight: {weight};")
 
-    # ------------------------------------------------------------------
-    # 公开方法 - 由 MainWindow 调用更新视图
-    # ------------------------------------------------------------------
     def set_track(self, track: Optional[TrackMetadata], index: int, total: int) -> None:
         if track is None:
             self.lbl_title.setText("Song")
@@ -327,24 +295,19 @@ class PlayerPanel(QWidget):
         self._refresh_mode_buttons()
 
     def set_lyrics_available(self, available: bool) -> None:
-        """没有歌词时,左上角的歌词图标变灰。"""
+        """Update the lyrics icon state."""
         self.btn_library.set_enabled_visual(available)
 
-    # ------------------------------------------------------------------
-    # 内部
-    # ------------------------------------------------------------------
     def _on_shuffle_clicked(self) -> None:
         self.shuffle_toggle_requested.emit(not self._shuffled)
 
     def _on_repeat_clicked(self) -> None:
-        # NONE → ALL → ONE → NONE 循环切换
         order = [RepeatMode.NONE, RepeatMode.ALL, RepeatMode.ONE]
         i = order.index(self._repeat) if self._repeat in order else 0
         new_repeat = order[(i + 1) % len(order)]
         self.repeat_change_requested.emit(new_repeat)
 
     def _refresh_mode_buttons(self) -> None:
-        # active = 启用时的小圆底圈;enabled_visual = 启用白色 / 关闭灰色
         repeat_on = self._repeat in (RepeatMode.ALL, RepeatMode.ONE)
         self.btn_shuffle.set_active(self._shuffled)
         self.btn_shuffle.set_enabled_visual(self._shuffled)
@@ -359,9 +322,6 @@ class PlayerPanel(QWidget):
         for lbl in (self.lbl_title, self.lbl_artist, self.lbl_album):
             lbl.reset_scroll()
 
-    # ------------------------------------------------------------------
-    # 几何锁定
-    # ------------------------------------------------------------------
     def resizeEvent(self, e):  # noqa: N802
         super().resizeEvent(e)
         self._lock_width_to_height()
@@ -371,45 +331,25 @@ class PlayerPanel(QWidget):
         self._lock_width_to_height()
 
     def _lock_width_to_height(self) -> None:
-        """根据当前高度反推面板理想宽度,使封面四边到面板边距相等。
-
-        几何关系(M = self._margin):
-            封面宽 = 封面高
-            封面宽 = 面板宽 - 2M
-            封面高 = 面板高 - 2M - 下方控件高
-        所以  面板宽 = 面板高 - 下方控件高
-
-        额外约束: 面板宽 ≤ 窗口宽 / 2, 保证右侧视图始终不窄于本面板。
-        这个上限同时也阻止了"最大化时面板膨胀到取消最大化时窗口缩不回去"的 bug。
-        """
+        """Keep cover geometry balanced as the window changes."""
         h = self.height()
         if h <= 0:
             return
-        # 下方控件区高度只取决于字体和固定按钮, 与窗口尺寸无关 → 缓存一次。
-        # 拖动窗口时每个像素都会触发 resize, 不缓存的话每次都会递归重算 sizeHint。
         if self._cached_below_h is None:
             self._cached_below_h = self._below.sizeHint().height()
         below_h = self._cached_below_h
 
-        # 面板理想宽 = 高 - 下方控件高(不含上下边距,边距已经在两侧对称分布)
         ideal_w = h - below_h
 
-        # 上限: 不超过窗口宽度的一半, 这样右侧视图永远 ≥ 左侧。
-        # 主窗口的 setMinimumSize 把窗口宽下限设为 2*491+1=983, 即默认/最小态
-        # 下两侧正好等宽 (491px); 用户向右拖宽窗口时左侧保持自然宽度, 多出的
-        # 都给右侧; 用户拖大窗口高度时左侧才会增长 (始终 ≤ 窗口宽/2)。
         win = self.window()
         if win and win.width() > 0:
-            half_w = (win.width() - 1) // 2  # 减 1 给中间分隔线
+            half_w = (win.width() - 1) // 2  # Leave one pixel for the divider.
             ideal_w = min(ideal_w, half_w)
 
-        # 极端最小, 兜底
         ideal_w = max(280, ideal_w)
         if self.maximumWidth() != ideal_w or self.minimumWidth() != ideal_w:
             self.setFixedWidth(ideal_w)
-            self.width_locked.emit(ideal_w)
 
-        # 信息区(歌名/歌手/专辑)宽度: 面板的 ~70%, 留出左右空白
         info = getattr(self, "_info_container", None)
         if info is not None:
             info_w = max(240, min(420, int(ideal_w * 0.70)))

@@ -215,7 +215,6 @@ class AlbumsPanel(QWidget):
         self._search_timer.setInterval(90)
         self._search_timer.timeout.connect(lambda: self._apply_filter(self.search_box.text()))
         self.search_box.textChanged.connect(lambda _text: self._search_timer.start())
-        # 单信号: 单击直接进详情(避免双击同时触发 click+doubleClick 重复加载封面)
         self.list_albums.itemClicked.connect(self._on_album_clicked)
         if self._embedded:
             self.btn_back_group.clicked.connect(self._on_back_to_artists)
@@ -255,7 +254,6 @@ class AlbumsPanel(QWidget):
         self.list_albums.setUpdatesEnabled(True)
 
         if self._embedded and self._filter_artist:
-            # 用预生成的缩略图代替同步读完整封面,避免 refresh() 阻塞 UI
             artist_cover_set = False
             for tracks in self._albums_tracks.values():
                 if not tracks:
@@ -336,7 +334,6 @@ class AlbumsPanel(QWidget):
         self.show_album(album)
 
     def _on_back_to_artists(self) -> None:
-        # 切回艺术家列表前清掉过滤,避免下次再打开时残留前一位艺术家的视图
         self._filter_artist = None
         self.back_to_artists_requested.emit()
 
@@ -365,7 +362,7 @@ class AlbumsPanel(QWidget):
             self._play_from_album(album, 0, sequential=True)
 
     def _play_from_album(self, album: str, track_index: int, *, sequential: bool = False) -> None:
-        """从当前专辑内播起;队列范围始终限制在这张专辑内。"""
+        """Play within the current album."""
         tracks = self._albums_tracks.get(album, [])
         if not tracks:
             return

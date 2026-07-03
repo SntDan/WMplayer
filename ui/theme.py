@@ -1,20 +1,15 @@
-"""
-主题模块
-========
-集中管理颜色 / 字号 / 间距,方便后续切换皮肤。
-"""
+"""Shared Qt theme styles."""
 
 from PyQt6.QtGui import QColor
 
 
 class Theme:
-    # 与草图一致:黑底,白色为布局/文字,红色为按钮
     BG = QColor("#000000")
     PANEL_BG = QColor("#000000")
     BORDER = QColor("#FFFFFF")
     TEXT = QColor("#FFFFFF")
     TEXT_DIM = QColor("#9E9E9E")
-    ACCENT = QColor("#E63946")           # 红色 - 功能性按钮
+    ACCENT = QColor("#E63946")
     ACCENT_HOVER = QColor("#FF5A66")
     PROGRESS_BG = QColor("#3A3A3A")
     PROGRESS_FG = QColor("#FFFFFF")
@@ -23,7 +18,6 @@ class Theme:
     LIST_PLAYING = QColor("#E63946")
 
 
-# 共用按钮样式(深色面板上的次级按钮: 添加文件夹/扫描/浏览…等)
 BTN_QSS = (
     "QPushButton{background:#1a1a1a; border:1px solid #333; "
     "padding:4px 10px; border-radius:4px; color:#FFF;}"
@@ -31,7 +25,6 @@ BTN_QSS = (
     "QPushButton:disabled{color:#555;}"
 )
 
-# 红底主操作按钮(返回/播放全部/确定 等)
 PRIMARY_BTN_QSS = (
     "QPushButton{background:#E63946; color:#FFF; border:none; "
     "padding:6px 12px; border-radius:4px; font-weight:bold;}"

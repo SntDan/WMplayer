@@ -21,10 +21,19 @@ from typing import Any, Dict, Optional
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 
-class _MpvIpcProcess:
+class _PendingRequest:
+    def __init__(self) -> None:
+        self.event = threading.Event()
+        self.response: Optional[Dict[str, Any]] = None
+
+
+class _MpvIpcProcess(QObject):
     """Small JSON IPC wrapper around mpv.exe."""
 
+    event_received = pyqtSignal(dict)
+
     def __init__(self) -> None:
+        super().__init__()
         exe = self._find_mpv_executable()
         if not exe:
             raise RuntimeError("mpv.exe was not found on PATH.")
@@ -69,17 +78,37 @@ class _MpvIpcProcess:
             creationflags=creationflags,
         )
         self._pipe = self._open_pipe()
-        self._lock = threading.Lock()
+        self._write_lock = threading.Lock()
+        self._pending_lock = threading.Lock()
+        self._pending: Dict[int, _PendingRequest] = {}
         self._request_id = 0
-        self._events = []
         self._closed = False
+        self._reader = threading.Thread(target=self._reader_loop, daemon=True)
+        self._reader.start()
 
     def command(self, *command: Any, timeout: float = 1.5) -> Any:
-        with self._lock:
-            request_id = self._next_request_id()
-            self._write_line({"command": list(command), "request_id": request_id})
-            response, events = self._read_response(request_id, timeout)
-        self._dispatch_events(events)
+        if self._closed:
+            return None
+        pending = _PendingRequest()
+        request_id = -1
+        try:
+            with self._write_lock:
+                request_id = self._next_request_id()
+                with self._pending_lock:
+                    self._pending[request_id] = pending
+                self._write_line({"command": list(command), "request_id": request_id})
+        except Exception:
+            if request_id >= 0:
+                with self._pending_lock:
+                    self._pending.pop(request_id, None)
+            raise
+        try:
+            if not pending.event.wait(timeout):
+                raise TimeoutError(f"mpv command timed out: request {request_id}")
+            response = pending.response
+        finally:
+            with self._pending_lock:
+                self._pending.pop(request_id, None)
         if not isinstance(response, dict):
             return None
         error = response.get("error")
@@ -88,16 +117,22 @@ class _MpvIpcProcess:
         return response.get("data")
 
     def add_event_handler(self, callback) -> None:
-        self._events.append(callback)
+        self.event_received.connect(callback)
 
     def close(self) -> None:
-        self._closed = True
+        if self._closed:
+            return
         try:
             self.command("quit", timeout=0.5)
         except Exception:
             pass
+        self._closed = True
         try:
             self._pipe.close()
+        except Exception:
+            pass
+        try:
+            self._reader.join(timeout=0.5)
         except Exception:
             pass
         if self._process.poll() is None:
@@ -141,40 +176,35 @@ class _MpvIpcProcess:
                 time.sleep(0.05)
         raise RuntimeError(f"Could not connect to mpv IPC: {last_error}")
 
-    def _read_response(self, request_id: int, timeout: float) -> tuple[Optional[Dict[str, Any]], list[Dict[str, Any]]]:
-        deadline = time.monotonic() + timeout
-        events: list[Dict[str, Any]] = []
-        while time.monotonic() < deadline:
-            remaining = max(0.01, deadline - time.monotonic())
+    def _reader_loop(self) -> None:
+        while not self._closed:
             try:
-                raw = self._pipe.readline(remaining)
+                raw = self._pipe.readline(0.1)
             except TypeError:
                 raw = self._pipe.readline()
+            except Exception:
+                break
             if not raw:
                 continue
             try:
                 message = json.loads(raw.decode("utf-8", errors="replace"))
             except Exception:
                 continue
-            if message.get("request_id") == request_id:
-                return message, events
-            events.append(message)
-        raise TimeoutError(f"mpv command timed out: request {request_id}")
-
-    def _dispatch_events(self, events: list[Dict[str, Any]]) -> None:
-        if not events:
-            return
-        callbacks = list(self._events)
-        for message in events:
-            for callback in callbacks:
-                QTimer.singleShot(0, lambda msg=message, cb=callback: self._safe_dispatch(cb, msg))
-
-    @staticmethod
-    def _safe_dispatch(callback, message: Dict[str, Any]) -> None:
-        try:
-            callback(message)
-        except Exception:
-            pass
+            request_id = message.get("request_id")
+            pending = None
+            if request_id is not None:
+                try:
+                    request_id = int(request_id)
+                except (TypeError, ValueError):
+                    request_id = None
+                if request_id is not None:
+                    with self._pending_lock:
+                        pending = self._pending.get(request_id)
+            if pending is not None:
+                pending.response = message
+                pending.event.set()
+            else:
+                self.event_received.emit(message)
 
     def _next_request_id(self) -> int:
         self._request_id += 1
@@ -278,7 +308,6 @@ class AudioEngine(QObject):
         self._finish_event_pending = False
         self._finish_fallback_triggered = False
         self._last_position_sync = 0.0
-        self._last_duration_poll = 0.0
 
         try:
             self._player = _MpvIpcProcess()
@@ -286,6 +315,8 @@ class AudioEngine(QObject):
             self._player.command("set_property", "volume", self._volume)
             self._player.command("observe_property", 1, "path")
             self._player.command("observe_property", 2, "pause")
+            self._player.command("observe_property", 3, "duration")
+            self._player.command("observe_property", 4, "time-pos")
         except Exception as exc:
             message = f"MPV backend is unavailable: {exc}"
             QTimer.singleShot(0, lambda: self.error_occurred.emit(message))
@@ -461,6 +492,8 @@ class AudioEngine(QObject):
             return
         if self._preloaded_path:
             self._gapless_handoff_path = self._preloaded_path
+            self._last_position_sync = time.monotonic()
+            return
         else:
             self._playing = False
         self._last_position_sync = time.monotonic()
@@ -471,6 +504,25 @@ class AudioEngine(QObject):
             return
         name = str(event.get("name") or "")
         data = event.get("data")
+        if name == "duration":
+            try:
+                duration_ms = int(float(data) * 1000)
+            except (TypeError, ValueError):
+                return
+            if duration_ms > 0 and abs(duration_ms - self._duration_ms) > 250:
+                self._duration_ms = duration_ms
+                self.duration_changed.emit(duration_ms)
+            return
+        if name == "time-pos":
+            try:
+                position_ms = max(0, int(float(data) * 1000))
+            except (TypeError, ValueError):
+                return
+            self._position_ms = position_ms
+            self._last_position_sync = time.monotonic()
+            if not self._playing:
+                self.position_changed.emit(position_ms)
+            return
         if name == "pause" and isinstance(data, bool) and self._current_path:
             playing = not data
             if self._playing != playing:
@@ -514,20 +566,7 @@ class AudioEngine(QObject):
         if self._playing:
             estimated = self._estimated_position_ms(now)
             self.position_changed.emit(estimated)
-            if now - self._last_position_sync >= 0.35:
-                position = self._get_float_property("time-pos", timeout=0.05)
-                if position is not None:
-                    self._position_ms = max(0, int(position * 1000))
-                    self._last_position_sync = now
             self._check_end_fallback(estimated)
-        if self._duration_ms <= 0 or now - self._last_duration_poll >= 2.0:
-            self._last_duration_poll = now
-            duration = self._get_float_property("duration", timeout=0.05)
-            if duration and duration > 0:
-                duration_ms = int(duration * 1000)
-                if abs(duration_ms - self._duration_ms) > 250:
-                    self._duration_ms = duration_ms
-                    self.duration_changed.emit(duration_ms)
 
     def _check_end_fallback(self, estimated_position_ms: int) -> None:
         if (
@@ -572,15 +611,6 @@ class AudioEngine(QObject):
         try:
             return self._player.command("get_property", name, timeout=timeout)
         except Exception:
-            return None
-
-    def _get_float_property(self, name: str, timeout: float = 0.4) -> Optional[float]:
-        value = self._get_property(name, timeout=timeout)
-        if value is None:
-            return None
-        try:
-            return float(value)
-        except (TypeError, ValueError):
             return None
 
     @staticmethod

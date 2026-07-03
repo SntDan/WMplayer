@@ -1,10 +1,4 @@
-"""
-歌单存储
-========
-- 默认目录(可写): 新建/重命名/删除都落到这里
-- 附加源(只读): 用户在设置里加入的其它文件夹或单独 .m3u8 文件
-  仅用于"读取并播放",不允许 rename/delete。
-"""
+"""Playlist file storage and discovery."""
 
 from __future__ import annotations
 
@@ -17,9 +11,9 @@ from core import m3u
 
 
 class PlaylistStore(QObject):
-    """默认目录 + 多个附加源(文件夹或单独 .m3u8 文件)。"""
+    """Playlist source manager."""
 
-    changed = pyqtSignal()  # 歌单集合发生变化
+    changed = pyqtSignal()
 
     def __init__(self, default_dir: str, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
@@ -30,9 +24,6 @@ class PlaylistStore(QObject):
         except Exception:
             pass
 
-    # ------------------------------------------------------------------
-    # 配置
-    # ------------------------------------------------------------------
     @property
     def default_dir(self) -> str:
         return self._default_dir
@@ -53,14 +44,8 @@ class PlaylistStore(QObject):
         self._locations = [l for l in locations if l]
         self.changed.emit()
 
-    # ------------------------------------------------------------------
-    # 内部: 把所有源解析成 (display_name, abs_path) 列表
-    # ------------------------------------------------------------------
     def _collect_entries(self) -> List[Tuple[str, str]]:
-        """按"默认目录优先 → 附加源按用户顺序"返回 (展示名, 绝对路径)。
-
-        重名时:第一次出现的胜出,后面的同名跳过(尊重用户的优先级)。
-        """
+        """Collect playlist files from configured sources."""
         seen_names: set = set()
         seen_paths: set = set()
         entries: List[Tuple[str, str]] = []
@@ -80,7 +65,6 @@ class PlaylistStore(QObject):
             seen_names.add(name)
             entries.append((name, ap))
 
-        # 默认目录优先
         if os.path.isdir(self._default_dir):
             try:
                 for f in sorted(os.listdir(self._default_dir)):
@@ -88,7 +72,6 @@ class PlaylistStore(QObject):
             except OSError:
                 pass
 
-        # 附加源:文件夹 / 单文件
         for loc in self._locations:
             if os.path.isfile(loc):
                 _try_add(loc)
@@ -104,29 +87,23 @@ class PlaylistStore(QObject):
     def _name_to_path(self) -> Dict[str, str]:
         return {name: path for name, path in self._collect_entries()}
 
-    # ------------------------------------------------------------------
-    # 列出
-    # ------------------------------------------------------------------
     def list_names(self) -> List[str]:
         return [name for name, _ in self._collect_entries()]
 
     def file_path(self, name: str) -> str:
-        """根据名字找到歌单文件;找不到时返回默认目录下的拟定路径。"""
+        """Resolve or create a playlist path."""
         m = self._name_to_path()
         if name in m:
             return m[name]
         return os.path.join(self._default_dir, name + ".m3u8")
 
     def is_writable(self, name: str) -> bool:
-        """歌单是否在默认目录里(允许 rename/delete)。"""
+        """Return whether a playlist is in the writable folder."""
         path = self._name_to_path().get(name)
         if not path:
             return False
         return os.path.dirname(path) == os.path.abspath(self._default_dir)
 
-    # ------------------------------------------------------------------
-    # 加载/保存/删除/重命名 (写操作只针对默认目录)
-    # ------------------------------------------------------------------
     def load(self, name: str) -> List[str]:
         return m3u.parse_file(self.file_path(name))
 

@@ -1,9 +1,4 @@
-"""
-曲库视图
-========
-显示扫描到的所有曲目。可以统一搜索歌手/专辑/歌曲,双击播放或跳转。
-顶部有"扫描曲库"按钮和扫描进度条。
-"""
+"""Library search and playback panel."""
 
 from __future__ import annotations
 
@@ -40,10 +35,9 @@ from ui.theme import BTN_QSS as _BTN_QSS
 
 class LibraryPanel(QWidget):
 
-    # 用户操作信号 (path 或 path 列表)
-    play_paths_now = pyqtSignal(list, int)           # 立即替换队列并播放第 N 首
-    enqueue_paths = pyqtSignal(list)               # 追加到队列尾
-    add_paths_to_playlist = pyqtSignal(list)       # 弹出选择对话框 → 加入某个歌单
+    play_paths_now = pyqtSignal(list, int)
+    enqueue_paths = pyqtSignal(list)
+    add_paths_to_playlist = pyqtSignal(list)
     open_artist_requested = pyqtSignal(str)
     open_album_requested = pyqtSignal(str)
     rescan_requested = pyqtSignal()
@@ -60,7 +54,6 @@ class LibraryPanel(QWidget):
         outer.setContentsMargins(20, 16, 20, 16)
         outer.setSpacing(10)
 
-        # 标题 + 计数
         header = QHBoxLayout()
         self.title_label = QLabel(tr("library"))
         f = QFont(); f.setPointSize(15); f.setBold(True); self.title_label.setFont(f)
@@ -71,7 +64,6 @@ class LibraryPanel(QWidget):
         header.addWidget(self.count_label)
         outer.addLayout(header)
 
-        # 操作行: 搜索 + 扫描
         action_row = QHBoxLayout()
         action_row.setSpacing(6)
         self.search = QLineEdit()
@@ -85,7 +77,6 @@ class LibraryPanel(QWidget):
         action_row.addWidget(self.btn_scan)
         outer.addLayout(action_row)
 
-        # 扫描进度
         self.progress = QProgressBar()
         self.progress.setVisible(False)
         self.progress.setTextVisible(True)
@@ -96,7 +87,6 @@ class LibraryPanel(QWidget):
         )
         outer.addWidget(self.progress)
 
-        # 列表
         self.list = QListWidget()
         self.list.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
         self.list.setUniformItemSizes(False)
@@ -123,9 +113,6 @@ class LibraryPanel(QWidget):
         self.list.itemDoubleClicked.connect(self._on_double_click)
         self.list.customContextMenuRequested.connect(self._on_context_menu)
 
-    # ------------------------------------------------------------------
-    # 数据
-    # ------------------------------------------------------------------
     _ROLE_RESULT_KIND = Qt.ItemDataRole.UserRole + 10
     _ROLE_RESULT_PATHS = Qt.ItemDataRole.UserRole + 11
     _ROLE_FILTER_HAY = Qt.ItemDataRole.UserRole + 12
@@ -238,9 +225,6 @@ class LibraryPanel(QWidget):
         item.setData(self._ROLE_FILTER_HAY, hay)
         self.list.addItem(item)
 
-    # ------------------------------------------------------------------
-    # 扫描
-    # ------------------------------------------------------------------
     def _on_scan_started(self) -> None:
         self.progress.setVisible(True)
         self.progress.setRange(0, 0)
@@ -257,9 +241,6 @@ class LibraryPanel(QWidget):
         self.progress.setVisible(False)
         self.btn_scan.setEnabled(True)
 
-    # ------------------------------------------------------------------
-    # 交互
-    # ------------------------------------------------------------------
     def _selected_paths(self) -> List[str]:
         items = self.list.selectedItems() or ([self.list.currentItem()] if self.list.currentItem() else [])
         paths: List[str] = []

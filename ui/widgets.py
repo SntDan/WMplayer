@@ -1,15 +1,4 @@
-"""
-自定义控件
-==========
-- IconButton:  红色图标按钮(线性图标,可切换激活状态)
-- CircleButton: 白色环形按钮,用于播放/上下首
-- AlbumCover:  方形封面显示
-- ProgressBar: 自绘进度条(可拖动)
-- ScrollingLabel: 长文本时滚动显示
-
-图标全部以 Lucide 风格的 24x24 SVG path 描述,通过 QPainter 渲染,
-保持统一的描边粗细 / 圆角端点 / 视觉重量。
-"""
+"""Custom Qt widgets."""
 
 from __future__ import annotations
 
@@ -42,26 +31,14 @@ from PyQt6.QtWidgets import QLabel, QPushButton, QSizePolicy, QWidget
 from .theme import Theme
 
 
-# ----------------------------------------------------------------------
-# 图标系统
-# ----------------------------------------------------------------------
-# Lucide (https://lucide.dev) ISC 协议,使用 24x24 viewBox,统一 stroke-width=2
-# round linecap/linejoin。我们直接把 path 数据嵌入代码,不引入外部资源。
 #
-# 渲染时:
-#   - IconButton (红色描边) → 用 stroke 而非 fill,粗细随按钮大小自适应
-#   - CircleButton 内部图标 (实心三角/竖条) → 用 fill,搭配白色圆环
 #
-# 所有 path 取自 lucide-static@latest,本身已经经过细致设计。
 
-# 线条类图标 (描边): 由 IconButton 渲染
 LUCIDE_STROKE: dict[str, str] = {
-    # 曲库 - book-open
     "library": (
         "M12 7v14 "
         "M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"
     ),
-    # 随机 - shuffle
     "shuffle": (
         "M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22 "
         "M18 2l4 4-4 4 "
@@ -69,14 +46,12 @@ LUCIDE_STROKE: dict[str, str] = {
         "M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8 "
         "M18 14l4 4-4 4"
     ),
-    # 列表循环 - repeat (两个箭头形成的循环框)
     "repeat": (
-        "M17 2 L21 6 L17 10 "          # 右上箭头
-        "M21 6 L7 6 A4 4 0 0 0 3 10 L3 11 "  # 上半线 + 左下圆角
-        "M7 22 L3 18 L7 14 "           # 左下箭头
-        "M3 18 L17 18 A4 4 0 0 0 21 14 L21 13"  # 下半线 + 右上圆角
+        "M17 2 L21 6 L17 10 "
+        "M21 6 L7 6 A4 4 0 0 0 3 10 L3 11 "
+        "M7 22 L3 18 L7 14 "
+        "M3 18 L17 18 A4 4 0 0 0 21 14 L21 13"
     ),
-    # 单曲循环 - repeat-1 (在 repeat 中间画一个 1)
     "repeat_one": (
         "M17 2 L21 6 L17 10 "
         "M21 6 L7 6 A4 4 0 0 0 3 10 L3 11 "
@@ -85,37 +60,29 @@ LUCIDE_STROKE: dict[str, str] = {
         "M11 9 L13 9 L13 15 "
         "M11.5 15 L14.5 15"
     ),
-    # 返回 - undo-2 (左下弯箭头)
     "back": (
         "M9 14 4 9l5-5 "
         "M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5 5.5 5.5 0 0 1-5.5 5.5H11"
     ),
-    # 文件夹 - folder
     "folder": (
         "M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"
     ),
-    # 设置 - settings (齿轮)
     "settings": (
         "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z "
         "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
     ),
 }
 
-# 实心图标(填充): 由 CircleButton 内部使用 + 暂停 / 播放
 LUCIDE_FILL: dict[str, str] = {
-    # 播放 - 实心三角
     "play": "M8 5v14l11-7z",
-    # 暂停 - 两条粗竖条
     "pause": "M6 5h4v14H6zM14 5h4v14h-4z",
-    # 上一首 - 左竖条 + 左指三角
     "prev": (
-        "M5 5 L5 19 L7 19 L7 5 Z "      # 左竖条
-        "M19 5 L19 19 L8 12 Z"           # 左指三角
+        "M5 5 L5 19 L7 19 L7 5 Z "
+        "M19 5 L19 19 L8 12 Z"
     ),
-    # 下一首 - 右指三角 + 右竖条
     "next": (
-        "M5 5 L5 19 L16 12 Z "           # 右指三角
-        "M17 5 L17 19 L19 19 L19 5 Z"   # 右竖条
+        "M5 5 L5 19 L16 12 Z "
+        "M17 5 L17 19 L19 19 L19 5 Z"
     ),
 }
 
@@ -128,7 +95,7 @@ def _draw_lucide_stroke(
     stroke_ratio: float = 2.0 / 24.0,
     text_overlay: Optional[str] = None,
 ) -> None:
-    """把 24x24 视口的 stroke path 绘制到给定矩形里。"""
+    """Draw a Lucide stroke icon."""
     if not _HAS_QTSVG:
         return
     side = min(rect.width(), rect.height())
@@ -136,7 +103,6 @@ def _draw_lucide_stroke(
         return
 
     painter.save()
-    # 用 SVG renderer:把整个 path 包装成完整 svg,让 Qt 处理 path parsing
     svg = (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
         f'fill="none" stroke="{color.name()}" '
@@ -146,7 +112,6 @@ def _draw_lucide_stroke(
         '</svg>'
     )
     renderer = QSvgRenderer(svg.encode("utf-8"))
-    # 居中 + 保持宽高比
     target = QRectF(
         rect.center().x() - side / 2,
         rect.center().y() - side / 2,
@@ -163,7 +128,7 @@ def _draw_lucide_fill(
     path_data: str,
     color: QColor,
 ) -> None:
-    """渲染填充 path(用于播放 / 暂停 / 上下首图标里的实心部分)。"""
+    """Draw a filled transport icon."""
     if not _HAS_QTSVG:
         return
     side = min(rect.width(), rect.height())
@@ -187,9 +152,6 @@ def _draw_lucide_fill(
     painter.restore()
 
 
-# ----------------------------------------------------------------------
-# 红色矢量图标按钮 (用于草图中红色的所有功能键)
-# ----------------------------------------------------------------------
 class IconButton(QPushButton):
     def __init__(
         self,
@@ -203,7 +165,7 @@ class IconButton(QPushButton):
         self._icon_name = icon_name
         self._color = color
         self._hover_color = QColor("#FFFFFF")
-        self._disabled_color = QColor("#555555")  # "功能不可用"时的灰
+        self._disabled_color = QColor("#555555")
         self._active = active
         self._enabled_visual = True
         self._size = size
@@ -223,13 +185,13 @@ class IconButton(QPushButton):
         return self._active
 
     def set_enabled_visual(self, enabled: bool) -> None:
-        """视觉禁用(变灰),不影响实际可点击。"""
+        """Change visual availability without disabling clicks."""
         if self._enabled_visual != enabled:
             self._enabled_visual = enabled
             self.update()
 
     def set_icon_y_offset(self, offset: int) -> None:
-        """只移动图标绘制位置,不改变按钮本身的布局/点击区域。"""
+        """Move icon drawing without changing layout."""
         if self._icon_y_offset != offset:
             self._icon_y_offset = offset
             self.update()
@@ -238,7 +200,6 @@ class IconButton(QPushButton):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = QRectF(0, 0, self.width(), self.height())
-        # 激活态加一个淡灰底圈
         if self._active and self._enabled_visual:
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QColor(255, 255, 255, 28))
@@ -259,9 +220,6 @@ class IconButton(QPushButton):
         p.end()
 
 
-# ----------------------------------------------------------------------
-# 圆形按钮 (用于播放/上下首三大键 - 白色边框,内嵌图标)
-# ----------------------------------------------------------------------
 class CircleButton(QPushButton):
     def __init__(
         self,
@@ -284,13 +242,11 @@ class CircleButton(QPushButton):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = QRectF(2, 2, self.width() - 4, self.height() - 4)
         col = QColor("#CCCCCC") if self.underMouse() else Theme.TEXT
-        # 圆环
         pen = QPen(col)
         pen.setWidthF(max(1.6, self.width() * 0.030))
         p.setPen(pen)
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawEllipse(rect)
-        # 内部图标:占圆直径的约 42%
         icon_side = self.width() * 0.42
         icon_rect = QRectF(
             rect.center().x() - icon_side / 2,
@@ -304,15 +260,11 @@ class CircleButton(QPushButton):
         p.end()
 
 
-# ----------------------------------------------------------------------
-# 封面显示
-# ----------------------------------------------------------------------
 class AlbumCover(QWidget):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._pixmap: Optional[QPixmap] = None
         self.setMinimumSize(180, 180)
-        # 让 widget 真正按 1:1 缩放:宽度可弹性,高度跟随宽度
         sp = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         sp.setHeightForWidth(True)
         self.setSizePolicy(sp)
@@ -338,15 +290,12 @@ class AlbumCover(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         rect = self.rect()
-        # 始终保持正方形 - 居中，尺寸稍微缩小一些(打九折)以防过挤
         base_side = min(rect.width(), rect.height())
         side = int(base_side * 0.97)
         x = (rect.width() - side) // 2
         y = x if rect.height() >= rect.width() else (rect.height() - side) // 2
         target = QRectF(x, y, side, side)
-        # 封面或占位
         if self._pixmap and not self._pixmap.isNull():
-            # 有封面:撑满,不画边框
             scaled = self._pixmap.scaled(
                 int(side), int(side),
                 Qt.AspectRatioMode.KeepAspectRatio,
@@ -356,28 +305,23 @@ class AlbumCover(QWidget):
             sy = y + (side - scaled.height()) // 2
             p.drawPixmap(sx, sy, scaled)
         else:
-            # 切歌等待异步封面时保持纯黑,避免占位文字闪烁。
             p.fillRect(target, QColor("#000000"))
         p.end()
 
 
-# ----------------------------------------------------------------------
-# 进度条
-# ----------------------------------------------------------------------
 class ProgressBar(QWidget):
-    """带可拖动滑块的水平进度条。"""
+    """Draggable progress bar."""
 
-    seek_requested = pyqtSignal(int)  # 用户拖到的毫秒位置
+    seek_requested = pyqtSignal(int)  # Target position in milliseconds.
 
-    _DOT_R = 5           # 圆点半径
-    _PAD = 7             # 两侧内边距(略大于半径,防止抗锯齿被裁)
+    _DOT_R = 5           # Thumb radius.
+    _PAD = 7             # Padding prevents clipped antialiasing.
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._position = 0
         self._duration = 0
         self._dragging = False
-        # 高度贴近可见圆点,避免进度条用隐形高度撑开播放器布局。
         self.setFixedHeight(self._DOT_R * 2 + 2)
         self.setMouseTracking(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -391,9 +335,8 @@ class ProgressBar(QWidget):
         self._duration = max(0, ms)
         self.update()
 
-    # ---------- 鼠标 ----------
     def _bar_range(self) -> tuple[int, int]:
-        """实际进度条的左/右像素位置(扣除两侧 padding)。"""
+        """Return the visible progress bar range."""
         return self._PAD, max(self._PAD, self.width() - self._PAD)
 
     def _ms_at(self, x: int) -> int:
@@ -431,19 +374,16 @@ class ProgressBar(QWidget):
         left, right = self._bar_range()
         bar_w = right - left
 
-        # 背景轨道
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QBrush(Theme.PROGRESS_BG))
         p.drawRoundedRect(QRectF(left, y, bar_w, h), 2, 2)
 
-        # 已播放
         if self._duration > 0 and bar_w > 0:
             ratio = max(0.0, min(1.0, self._position / self._duration))
             played_w = bar_w * ratio
             p.setBrush(QBrush(Theme.PROGRESS_FG))
             p.drawRoundedRect(QRectF(left, y, played_w, h), 2, 2)
 
-            # 圆点中心:始终在 [left, right] 之间,两端不再被裁
             cx = left + played_w
             cy = self.height() / 2
             p.drawEllipse(QPointF(cx, cy), self._DOT_R, self._DOT_R)
@@ -451,16 +391,8 @@ class ProgressBar(QWidget):
         p.end()
 
 
-# ----------------------------------------------------------------------
-# 滚动文本(供长歌名用)
-# ----------------------------------------------------------------------
 class ScrollingLabel(QLabel):
-    """长文本时左右往返滚动。
-
-    - 不再持有内部 QTimer; 由外部 (PlayerPanel) 统一驱动 ``tick()``,
-      使多个标签的滚动节奏完全同步。
-    - 支持双击信号, 可替代单独的 ClickableLabel。
-    """
+    """Label with external marquee control."""
 
     double_clicked = pyqtSignal()
 
@@ -470,7 +402,6 @@ class ScrollingLabel(QLabel):
         self._direction = 1
         self._pause_ticks = 0
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # 水平方向 Ignored: 无论文字多长都不会向父布局请求更多宽度
         sp = QSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.setSizePolicy(sp)
 
@@ -489,7 +420,7 @@ class ScrollingLabel(QLabel):
         self.update()
 
     def needs_scroll(self) -> bool:
-        """文字宽度是否超出可视宽度。"""
+        """Return whether the text overflows."""
         return self.scroll_limit() > 0
 
     def scroll_limit(self) -> int:
@@ -509,7 +440,7 @@ class ScrollingLabel(QLabel):
         self.update()
 
     def tick(self) -> None:
-        """由外部统一计时器驱动一格滚动。"""
+        """Advance one marquee frame."""
         if not self.needs_scroll() or not self.isVisible():
             return
         if self._pause_ticks > 0:
@@ -551,11 +482,7 @@ class ScrollingLabel(QLabel):
 
 
 class HRBadge(QWidget):
-    """高解析度音频徽章。
-
-    visible=True 时画一个金色描边 + "HR" 文字的小圆角矩形;
-    visible=False 时整个 widget 完全透明(全黑)。
-    """
+    """High-resolution audio badge."""
 
     GOLD = QColor("#D4AF37")
 

@@ -1,9 +1,4 @@
-"""
-播放队列视图
-============
-显示当前正在播的曲目集合,支持双击播放、右键移除、Delete 删除。
-顶部有"另存为歌单"按钮,把当前队列保存成 .m3u8。
-"""
+"""Playback queue panel."""
 
 from __future__ import annotations
 
@@ -39,12 +34,12 @@ from ui.list_delegates import (
 
 
 class QueuePanel(QWidget):
-    """当前播放队列。"""
+    """Playback queue panel."""
 
     track_double_clicked = pyqtSignal(int)
     remove_requested = pyqtSignal(int)
     clear_requested = pyqtSignal()
-    save_as_playlist_requested = pyqtSignal(str)   # 用户输入的歌单名
+    save_as_playlist_requested = pyqtSignal(str)
 
     def __init__(self, playlist: Playlist, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -60,7 +55,6 @@ class QueuePanel(QWidget):
         outer.setContentsMargins(20, 16, 20, 16)
         outer.setSpacing(10)
 
-        # 标题行
         header = QHBoxLayout()
         self.title_label = QLabel(tr("queue"))
         f = QFont(); f.setPointSize(15); f.setBold(True); self.title_label.setFont(f)
@@ -71,7 +65,6 @@ class QueuePanel(QWidget):
         header.addWidget(self.count_label)
         outer.addLayout(header)
 
-        # 操作行
         action_row = QHBoxLayout()
         action_row.setSpacing(6)
         self.search = QLineEdit()
@@ -87,7 +80,6 @@ class QueuePanel(QWidget):
             action_row.addWidget(b)
         outer.addLayout(action_row)
 
-        # 列表
         self.list = QListWidget()
         self.list.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
         self.list.setUniformItemSizes(True)
@@ -115,9 +107,6 @@ class QueuePanel(QWidget):
         sc = QShortcut(QKeySequence("Delete"), self.list)
         sc.activated.connect(self._delete_selected)
 
-    # ------------------------------------------------------------------
-    # 数据更新
-    # ------------------------------------------------------------------
     def refresh(self) -> None:
         self.list.setUpdatesEnabled(False)
         try:
@@ -160,9 +149,6 @@ class QueuePanel(QWidget):
         if item is not None:
             self.list.scrollToItem(item, QListWidget.ScrollHint.PositionAtCenter)
 
-    # ------------------------------------------------------------------
-    # 交互
-    # ------------------------------------------------------------------
     def _on_double_click(self, item: QListWidgetItem) -> None:
         idx = item.data(Qt.ItemDataRole.UserRole)
         if isinstance(idx, int):
