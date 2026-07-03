@@ -307,6 +307,7 @@ class AudioEngine(QObject):
         self._released = False
         self._finish_event_pending = False
         self._finish_fallback_triggered = False
+        self._ignore_end_until = 0.0
         self._last_position_sync = 0.0
 
         try:
@@ -343,6 +344,7 @@ class AudioEngine(QObject):
             self._duration_ms = 0
             self._position_ms = 0
             self._finish_fallback_triggered = False
+            self._ignore_end_until = time.monotonic() + 0.8
             self._last_position_sync = time.monotonic()
             self.duration_changed.emit(0)
             self.position_changed.emit(0)
@@ -352,6 +354,7 @@ class AudioEngine(QObject):
             self._loading_replacement = True
             self._gapless_handoff_path = None
             self._preloaded_path = None
+            self._ignore_end_until = 0.0
             self._player.command("set_property", "pause", True)
             self._player.command("loadfile", path, "replace")
             self._current_path = path
@@ -487,12 +490,16 @@ class AudioEngine(QObject):
             return
         if self._released or self._stopping or self._loading_replacement:
             return
+        now = time.monotonic()
+        if now < self._ignore_end_until:
+            return
         reason = str(event.get("reason") or "").lower()
         if reason and "eof" not in reason and reason not in {"end", "end-file"}:
             return
         if self._preloaded_path:
             self._gapless_handoff_path = self._preloaded_path
-            self._last_position_sync = time.monotonic()
+            self._ignore_end_until = now + 0.8
+            self._last_position_sync = now
             return
         else:
             self._playing = False
@@ -542,6 +549,7 @@ class AudioEngine(QObject):
             self._duration_ms = 0
             self._position_ms = 0
             self._finish_fallback_triggered = False
+            self._ignore_end_until = time.monotonic() + 0.8
             self._last_position_sync = time.monotonic()
             self.duration_changed.emit(0)
             self.position_changed.emit(0)
