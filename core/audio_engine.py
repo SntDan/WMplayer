@@ -56,8 +56,7 @@ class _MpvIpcProcess:
         if sys.platform == "win32":
             args.append("--ao=wasapi")
             args.append("--priority=abovenormal")
-            args.append("--media-controls=no")
-            args.append("--input-media-keys=no")
+            args.append("--media-controls=yes")
 
         if sys.platform == "win32" and hasattr(subprocess, "ABOVE_NORMAL_PRIORITY_CLASS"):
             creationflags |= subprocess.ABOVE_NORMAL_PRIORITY_CLASS
@@ -260,6 +259,7 @@ class AudioEngine(QObject):
     duration_changed = pyqtSignal(int)  # total duration in milliseconds
     state_changed = pyqtSignal(str)     # "playing" / "paused" / "stopped"
     track_finished = pyqtSignal()       # current track reached EOF
+    backend_track_changed = pyqtSignal(str)
     error_occurred = pyqtSignal(str)
 
     def __init__(self, parent: Optional[QObject] = None) -> None:
@@ -284,6 +284,8 @@ class AudioEngine(QObject):
             self._player = _MpvIpcProcess()
             self._player.add_event_handler(self._on_mpv_event)
             self._player.command("set_property", "volume", self._volume)
+            self._player.command("observe_property", 1, "path")
+            self._player.command("observe_property", 2, "pause")
         except Exception as exc:
             message = f"MPV backend is unavailable: {exc}"
             QTimer.singleShot(0, lambda: self.error_occurred.emit(message))
@@ -447,6 +449,9 @@ class AudioEngine(QObject):
             self._player.close()
 
     def _on_mpv_event(self, event: Dict[str, Any]) -> None:
+        if event.get("event") == "property-change":
+            self._on_mpv_property_change(event)
+            return
         if event.get("event") != "end-file":
             return
         if self._released or self._stopping or self._loading_replacement:
@@ -460,6 +465,35 @@ class AudioEngine(QObject):
             self._playing = False
         self._last_position_sync = time.monotonic()
         self._queue_track_finished()
+
+    def _on_mpv_property_change(self, event: Dict[str, Any]) -> None:
+        if self._released or self._stopping:
+            return
+        name = str(event.get("name") or "")
+        data = event.get("data")
+        if name == "pause" and isinstance(data, bool) and self._current_path:
+            playing = not data
+            if self._playing != playing:
+                self._position_ms = self._estimated_position_ms()
+                self._playing = playing
+                self._last_position_sync = time.monotonic()
+                self.state_changed.emit("playing" if playing else "paused")
+            return
+        if name != "path" or not isinstance(data, str) or not data:
+            return
+        if self._loading_replacement or self._same_path(data, self._current_path):
+            return
+        if self._preloaded_path and self._same_path(data, self._preloaded_path):
+            self._gapless_handoff_path = self._preloaded_path
+            self._current_path = data
+            self._preloaded_path = None
+            self._duration_ms = 0
+            self._position_ms = 0
+            self._finish_fallback_triggered = False
+            self._last_position_sync = time.monotonic()
+            self.duration_changed.emit(0)
+            self.position_changed.emit(0)
+            self.backend_track_changed.emit(data)
 
     def _queue_track_finished(self) -> None:
         if self._finish_event_pending:
@@ -550,7 +584,9 @@ class AudioEngine(QObject):
             return None
 
     @staticmethod
-    def _same_path(a: str, b: str) -> bool:
+    def _same_path(a: Optional[str], b: Optional[str]) -> bool:
+        if not a or not b:
+            return False
         try:
             return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
         except Exception:

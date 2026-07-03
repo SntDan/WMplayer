@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import os
+import time
 from typing import List, Optional
 
 from PyQt6.QtCore import (
@@ -98,6 +99,77 @@ class _CoverFetcher(QRunnable):
 # ----------------------------------------------------------------------
 # 右侧 segmented control
 # ----------------------------------------------------------------------
+class _MediaKeyHook(QObject):
+    command = pyqtSignal(int)
+
+    _WH_KEYBOARD_LL = 13
+    _WM_KEYDOWN = 0x0100
+    _WM_SYSKEYDOWN = 0x0104
+    _VK_TO_COMMAND = {
+        0xB0: 11,  # next track
+        0xB1: 12,  # previous track
+        0xB2: 13,  # stop
+        0xB3: 14,  # play/pause
+        0xFA: 46,  # play
+    }
+
+    def __init__(self, parent: Optional[QObject] = None) -> None:
+        super().__init__(parent)
+        self._hook = None
+        self._callback = None
+        if os.name == "nt":
+            self._install()
+
+    def close(self) -> None:
+        if not self._hook:
+            return
+        try:
+            import ctypes
+
+            ctypes.windll.user32.UnhookWindowsHookEx(self._hook)
+        except Exception:
+            pass
+        self._hook = None
+
+    def _install(self) -> None:
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            class KBDLLHOOKSTRUCT(ctypes.Structure):
+                _fields_ = [
+                    ("vkCode", wintypes.DWORD),
+                    ("scanCode", wintypes.DWORD),
+                    ("flags", wintypes.DWORD),
+                    ("time", wintypes.DWORD),
+                    ("dwExtraInfo", ctypes.c_void_p),
+                ]
+
+            hook_proc = ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM)
+            user32 = ctypes.windll.user32
+            kernel32 = ctypes.windll.kernel32
+
+            def _proc(n_code, w_param, l_param):
+                if n_code == 0 and int(w_param) in (self._WM_KEYDOWN, self._WM_SYSKEYDOWN):
+                    data = ctypes.cast(l_param, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
+                    command = self._VK_TO_COMMAND.get(int(data.vkCode))
+                    if command is not None:
+                        self.command.emit(command)
+                        return 1
+                return user32.CallNextHookEx(self._hook, n_code, w_param, l_param)
+
+            self._callback = hook_proc(_proc)
+            self._hook = user32.SetWindowsHookExW(
+                self._WH_KEYBOARD_LL,
+                self._callback,
+                kernel32.GetModuleHandleW(None),
+                0,
+            )
+        except Exception:
+            self._hook = None
+            self._callback = None
+
+
 class _Segmented(QWidget):
     """顶部右侧视图切换。"""
 
@@ -186,6 +258,8 @@ class MainWindow(QMainWindow):
         self._stable_timer.setInterval(120)
         self._stable_timer.timeout.connect(self._capture_stable_size)
         self._screen_sig_wired = False
+        self._last_media_command: tuple[int, float] = (-1, 0.0)
+        self._media_key_hook = _MediaKeyHook(self)
 
         # ------- 数据模型 -------
         self._engine = AudioEngine(self)
@@ -259,6 +333,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(right, 1)               # 最小宽度 = 左侧,多余宽度全部吃掉
 
     def _wire(self) -> None:
+        self._media_key_hook.command.connect(self._handle_media_app_command)
+
         # 顶部 segmented ↔ stack
         self.segmented.changed.connect(self._switch_view)
 
@@ -284,6 +360,7 @@ class MainWindow(QMainWindow):
         self._engine.duration_changed.connect(self._on_duration_changed)
         self._engine.state_changed.connect(self._on_state_changed)
         self._engine.track_finished.connect(self._on_track_finished)
+        self._engine.backend_track_changed.connect(self._on_backend_track_changed)
         self._engine.error_occurred.connect(
             lambda msg: self.statusBar().showMessage(tr("error_status", msg=msg), 4000)
         )
@@ -343,6 +420,36 @@ class MainWindow(QMainWindow):
         _sc("Left", lambda: self._engine.seek(self._engine.get_position() - 5000))
         _sc("Up", lambda: self._engine.set_volume(min(100, self._engine.get_volume() + 5)))
         _sc("Down", lambda: self._engine.set_volume(max(0, self._engine.get_volume() - 5)))
+
+    def _handle_media_app_command(self, command: int) -> bool:
+        now = time.monotonic()
+        last_command, last_time = self._last_media_command
+        if command == last_command and now - last_time < 0.18:
+            return True
+        self._last_media_command = (command, now)
+
+        if command == 11:  # APPCOMMAND_MEDIA_NEXTTRACK
+            self._play_next()
+            return True
+        if command == 12:  # APPCOMMAND_MEDIA_PREVIOUSTRACK
+            self._play_prev()
+            return True
+        if command == 13:  # APPCOMMAND_MEDIA_STOP
+            self._engine.stop()
+            self.player_panel.set_playing(False)
+            return True
+        if command == 14:  # APPCOMMAND_MEDIA_PLAY_PAUSE
+            self._toggle_play()
+            return True
+        if command == 46:  # APPCOMMAND_MEDIA_PLAY
+            if not self._engine.is_playing():
+                self._toggle_play()
+            return True
+        if command == 47:  # APPCOMMAND_MEDIA_PAUSE
+            if self._engine.is_playing():
+                self._toggle_play()
+            return True
+        return False
 
     def _on_player_width_locked(self, w: int) -> None:
         # 故意保持空实现。曾经在这里把窗口的 minimumWidth 跟 player_panel 一起涨,
@@ -521,6 +628,10 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
         try:
+            self._media_key_hook.close()
+        except Exception:
+            pass
+        try:
             self._engine.release()
         except Exception:
             pass
@@ -555,6 +666,13 @@ class MainWindow(QMainWindow):
         prv = self._playlist.prev_index()
         if prv is not None:
             self._play_index(prv)
+
+    def _on_backend_track_changed(self, path: str) -> None:
+        idx = self._playlist.find_index_by_path(path)
+        if idx is None or idx < 0 or idx == self._playlist.current_index:
+            return
+        self._autoplay_after_load = self._engine.is_playing()
+        self._playlist.set_current(idx)
 
     def _on_track_finished(self) -> None:
         nxt = self._playlist.next_index(auto=True)
