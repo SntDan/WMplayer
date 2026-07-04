@@ -23,7 +23,24 @@ def _set_windows_app_id() -> None:
         pass
 
 
+def _set_windows_dpi_awareness() -> None:
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        try:
+            import ctypes
+
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
+
+
 def main() -> int:
+    _set_windows_dpi_awareness()
     _set_windows_app_id()
 
     from PyQt6.QtWidgets import QApplication

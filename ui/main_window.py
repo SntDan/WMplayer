@@ -221,11 +221,6 @@ class MainWindow(QMainWindow):
         self._config = Config()
         set_language(str(self._config.get("language", "en")))
 
-        self._stable_size: QSize = QSize(983, 760)
-        self._stable_timer = QTimer(self)
-        self._stable_timer.setSingleShot(True)
-        self._stable_timer.setInterval(120)
-        self._stable_timer.timeout.connect(self._capture_stable_size)
         self._screen_sig_wired = False
         self._last_media_command: tuple[int, float] = (-1, 0.0)
         self._media_key_hook = _MediaKeyHook(self)
@@ -487,8 +482,6 @@ class MainWindow(QMainWindow):
         super().resizeEvent(e)
         if hasattr(self, "player_panel"):
             self.player_panel._lock_width_to_height()
-        if not self.isMaximized() and not self.isFullScreen():
-            self._stable_timer.start()
 
     def showEvent(self, e):  # noqa: N802
         super().showEvent(e)
@@ -497,28 +490,12 @@ class MainWindow(QMainWindow):
             wh.screenChanged.connect(self._on_screen_changed)
             self._screen_sig_wired = True
 
-    def _capture_stable_size(self) -> None:
-        if not self.isMaximized() and not self.isFullScreen():
-            self._stable_size = self.size()
-
     def _on_screen_changed(self, _screen) -> None:
         """Refresh layout after a screen change."""
         pp = getattr(self, "player_panel", None)
         if pp is not None:
             pp._cached_below_h = None
-        self._stable_timer.stop()
-        QTimer.singleShot(0, self._restore_stable_size)
-
-    def _restore_stable_size(self) -> None:
-        pp = getattr(self, "player_panel", None)
-        if pp is not None:
-            pp._lock_width_to_height()
-        target = self._stable_size
-        target_w = max(target.width(), self.minimumWidth())
-        target_h = max(target.height(), self.minimumHeight())
-        if self.size().width() != target_w or self.size().height() != target_h:
-            self.resize(target_w, target_h)
-        self._stable_timer.start()
+            QTimer.singleShot(0, pp._lock_width_to_height)
 
     def closeEvent(self, e):  # noqa: N802
         if not self._config.factory_reset_pending:
