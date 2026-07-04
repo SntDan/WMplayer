@@ -80,7 +80,7 @@ _STRINGS = {
         ),
         "about": (
             "<div style='color:#9E9E9E;font-size:11px;'>"
-            "Audio engine: libVLC &nbsp;|&nbsp; UI: PyQt6<br>"
+            "Audio engine: mpv &nbsp;|&nbsp; UI: PyQt6<br>"
             "Supports: MP3 / FLAC / WAV / ALAC / APE / OGG / Opus / DSD"
             "</div>"
         ),
@@ -186,7 +186,7 @@ _STRINGS = {
         "factory_reset_confirm": "将清除所有缓存(曲库索引、播放队列)并恢复默认设置，然后自动关闭程序。\n此操作不可撤销，是否继续？",
         "about": (
             "<div style='color:#9E9E9E;font-size:11px;'>"
-            "音频内核: libVLC &nbsp;|&nbsp; UI: PyQt6<br>"
+            "音频内核: mpv &nbsp;|&nbsp; UI: PyQt6<br>"
             "支持: MP3 / FLAC / WAV / ALAC / APE / OGG / Opus / DSD"
             "</div>"
         ),
