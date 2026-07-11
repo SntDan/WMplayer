@@ -49,10 +49,7 @@ QToolTip {
 
 QListWidget {
     background-color: #000000;
-    border: 1px solid #FFFFFF;
-    border-style: solid;
-    border-color: #FFFFFF;
-    border-width: 1px;
+    border: none;
     outline: 0;
     padding: 4px;
 }
