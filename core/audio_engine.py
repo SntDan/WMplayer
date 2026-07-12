@@ -216,6 +216,12 @@ class _MpvIpcProcess(QObject):
 
     @staticmethod
     def _find_mpv_executable() -> Optional[str]:
+        user_programs = os.environ.get("LOCALAPPDATA")
+        if user_programs:
+            for name in ("mpv.exe", "mpv.com"):
+                path = os.path.join(user_programs, "Programs", "mpv", name)
+                if os.path.exists(path):
+                    return path
         for name in ("mpv.exe", "mpv.com", "mpv"):
             found = shutil.which(name)
             if found:

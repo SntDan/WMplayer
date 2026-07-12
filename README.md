@@ -54,11 +54,19 @@ It uses mpv for playback, reads metadata with mutagen, and supports common lossl
 
 ## Usage
 
+On Windows, double-click `install-mpv.bat` in the WMplayer folder first. It downloads mpv from GitHub, installs it into `%LOCALAPPDATA%\Programs\mpv`, and adds that folder to the front of the user `PATH` so WMplayer and other apps can use the same mpv.
+
+You can also run it from PowerShell:
+
+```powershell
+.\install-mpv.bat
+```
+
 ```bash
 python WMplayer.py
 ```
 
-1. Install mpv on your system and make sure `mpv.exe` is available on `PATH`.
+1. Install mpv with `install-mpv.bat`, or install mpv yourself and make sure `mpv.exe` is available on `PATH`.
 2. Install Python dependencies with `pip install -r requirements.txt`.
 3. Start WMplayer.
 4. Open **Settings -> Library** and add your music folders.
@@ -188,11 +196,19 @@ WMplayer 是一个用 Python 和 PyQt6 写的本地桌面音乐播放器。它�
 
 ## 使用方法
 
+Windows 用户先双击项目根目录里的 `install-mpv.bat`。它会自动从 GitHub 下载 mpv，安装到 `%LOCALAPPDATA%\Programs\mpv`，并把这个文件夹加到用户级 `PATH` 最前面；这样 WMplayer 和其他软件都能共用同一个 mpv，不需要管理员权限。
+
+也可以在 PowerShell 里这样运行：
+
+```powershell
+.\install-mpv.bat
+```
+
 ```bash
 python WMplayer.py
 ```
 
-1. 先在系统中安装 mpv，并确保 `mpv.exe` 可以从 `PATH` 找到。
+1. 先用 `install-mpv.bat` 安装 mpv；或者自己安装 mpv，并确保 `mpv.exe` 可以从 `PATH` 找到。
 2. 使用 `pip install -r requirements.txt` 安装 Python 依赖。
 3. 启动 WMplayer。
 4. 打开 **Settings -> Library**，添加音乐文件夹。
