@@ -11,10 +11,22 @@ from mutagen.flac import FLAC, Picture
 from mutagen.mp4 import MP4
 from mutagen.oggvorbis import OggVorbis
 
-
 SUPPORTED_EXTS = {
-    ".mp3", ".flac", ".wav", ".m4a", ".aac", ".ogg", ".oga",
-    ".opus", ".ape", ".wma", ".alac", ".aiff", ".aif", ".dsf", ".dff",
+    ".mp3",
+    ".flac",
+    ".wav",
+    ".m4a",
+    ".aac",
+    ".ogg",
+    ".oga",
+    ".opus",
+    ".ape",
+    ".wma",
+    ".alac",
+    ".aiff",
+    ".aif",
+    ".dsf",
+    ".dff",
 }
 
 
@@ -87,7 +99,9 @@ def read_metadata(path: str, with_cover: bool = True) -> TrackMetadata:
             md.artist = artist
         if album:
             md.album = album
-        track_raw = _first_tag(audio, ["TRCK", "tracknumber", "TRACKNUMBER", "trkn", "WM/TrackNumber"])
+        track_raw = _first_tag(
+            audio, ["TRCK", "tracknumber", "TRACKNUMBER", "trkn", "WM/TrackNumber"]
+        )
         if track_raw:
             try:
                 md.track_number = int(str(track_raw).split("/")[0].strip())
@@ -148,6 +162,7 @@ def _extract_cover(audio, path: str) -> Optional[bytes]:
     try:
         if isinstance(audio, OggVorbis):
             import base64
+
             b64list = audio.get("metadata_block_picture", [])
             for b64 in b64list:
                 try:

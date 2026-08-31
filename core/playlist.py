@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-import os
 import random
 from enum import Enum
 from typing import List, Optional
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from core.metadata import TrackMetadata, is_supported, read_metadata
+from core.metadata import TrackMetadata
 
 
 class PlayMode(Enum):
     """Legacy combined playback mode."""
+
     SEQUENTIAL = "sequential"
     REPEAT_ONE = "repeat_one"
     REPEAT_ALL = "repeat_all"
@@ -65,33 +65,23 @@ class Playlist(QObject):
         self._repeat: RepeatMode = RepeatMode.NONE
         self._original_order: Optional[List[TrackMetadata]] = None
 
-    def replace_with_tracks(self, tracks: List[TrackMetadata], start_index: int = -1) -> int:
+    def replace_with_tracks(
+        self, tracks: List[TrackMetadata], start_index: int = -1
+    ) -> int:
         """Replace the queue with parsed tracks."""
         self._tracks = list(tracks)
         if 0 <= start_index < len(self._tracks):
             self._current_index = start_index
         else:
             self._current_index = -1
-            
+
         self._original_order = None
         if self._shuffled and self._tracks:
             self._enter_shuffle()
         else:
             self.changed.emit()
-            
-        return max(0, self._current_index)
 
-    def replace_with_paths(self, paths: List[str], start_index: int = -1) -> int:
-        """Replace the queue from file paths."""
-        tracks: List[TrackMetadata] = []
-        for p in paths:
-            if not p or not os.path.isfile(p) or not is_supported(p):
-                continue
-            try:
-                tracks.append(read_metadata(p, with_cover=False))
-            except Exception:
-                continue
-        return self.replace_with_tracks(tracks, start_index)
+        return max(0, self._current_index)
 
     def restore_with_tracks(
         self,
@@ -104,23 +94,6 @@ class Playlist(QObject):
         self._current_index = -1
         self.changed.emit()
 
-    def restore_with_paths(self, paths: List[str], original_paths: Optional[List[str]]) -> None:
-        """Restore a queue snapshot from paths."""
-        tracks = self._resolve_paths(paths)
-        orig = self._resolve_paths(original_paths) if original_paths else None
-        self.restore_with_tracks(tracks, orig)
-
-    @staticmethod
-    def _resolve_paths(paths: List[str]) -> List[TrackMetadata]:
-        out: List[TrackMetadata] = []
-        for p in paths:
-            if p and os.path.isfile(p) and is_supported(p):
-                try:
-                    out.append(read_metadata(p, with_cover=False))
-                except Exception:
-                    pass
-        return out
-
     def append_tracks(self, tracks: List[TrackMetadata]) -> int:
         existing = {t.path for t in self._tracks}
         added = 0
@@ -129,23 +102,6 @@ class Playlist(QObject):
                 continue
             self._tracks.append(t)
             existing.add(t.path)
-            added += 1
-        if added:
-            self.changed.emit()
-        return added
-
-    def append_paths(self, paths: List[str]) -> int:
-        existing = {t.path for t in self._tracks}
-        added = 0
-        for p in paths:
-            if not p or p in existing or not os.path.isfile(p) or not is_supported(p):
-                continue
-            try:
-                t = read_metadata(p, with_cover=False)
-            except Exception:
-                continue
-            self._tracks.append(t)
-            existing.add(p)
             added += 1
         if added:
             self.changed.emit()

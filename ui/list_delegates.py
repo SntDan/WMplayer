@@ -6,9 +6,16 @@ import os
 from typing import Optional
 
 from PyQt6.QtCore import QRect, QRectF, QSize, Qt
-from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen, QPixmap, QPixmapCache
+from PyQt6.QtGui import (
+    QColor,
+    QFont,
+    QFontMetrics,
+    QPainter,
+    QPen,
+    QPixmap,
+    QPixmapCache,
+)
 from PyQt6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem
-
 
 QPixmapCache.setCacheLimit(60 * 1024)  # 60 MB
 
@@ -38,7 +45,9 @@ class CoverRowDelegate(QStyledItemDelegate):
     def sizeHint(self, option: QStyleOptionViewItem, index) -> QSize:  # noqa: N802
         if bool(index.data(ROLE_SECTION_HEADER)):
             return QSize(option.rect.width() if option.rect.width() > 0 else 200, 42)
-        return QSize(option.rect.width() if option.rect.width() > 0 else 200, self.ROW_H)
+        return QSize(
+            option.rect.width() if option.rect.width() > 0 else 200, self.ROW_H
+        )
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index) -> None:
         painter.save()
@@ -47,7 +56,12 @@ class CoverRowDelegate(QStyledItemDelegate):
         rect = option.rect
 
         if bool(index.data(ROLE_SECTION_HEADER)):
-            self._paint_section_header(painter, rect, index.data(Qt.ItemDataRole.DisplayRole) or "", option.font)
+            self._paint_section_header(
+                painter,
+                rect,
+                index.data(Qt.ItemDataRole.DisplayRole) or "",
+                option.font,
+            )
             painter.restore()
             return
 
@@ -109,7 +123,9 @@ class CoverRowDelegate(QStyledItemDelegate):
         block_top = rect.top() + (self.THUMB_PX - block_h) // 2
 
         title_rect = QRect(text_x, block_top, text_w, title_h)
-        elided_title = title_fm.elidedText(str(title), Qt.TextElideMode.ElideRight, text_w)
+        elided_title = title_fm.elidedText(
+            str(title), Qt.TextElideMode.ElideRight, text_w
+        )
         painter.drawText(
             title_rect,
             Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
@@ -119,7 +135,9 @@ class CoverRowDelegate(QStyledItemDelegate):
         sub_rect = QRect(text_x, title_rect.bottom() + 2, text_w, sub_h)
         painter.setFont(sub_font)
         painter.setPen(QColor("#9A9A9A"))
-        elided_sub = sub_fm.elidedText(str(subtitle), Qt.TextElideMode.ElideRight, text_w)
+        elided_sub = sub_fm.elidedText(
+            str(subtitle), Qt.TextElideMode.ElideRight, text_w
+        )
         painter.drawText(
             sub_rect,
             Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
@@ -140,7 +158,9 @@ class CoverRowDelegate(QStyledItemDelegate):
         painter.setPen(pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRoundedRect(
-            QRectF(rect.x() + 0.5, rect.y() + 0.5, rect.width() - 1, rect.height() - 1), 3, 3
+            QRectF(rect.x() + 0.5, rect.y() + 0.5, rect.width() - 1, rect.height() - 1),
+            3,
+            3,
         )
         f = QFont(base_font)
         f.setPointSize(8)
@@ -151,7 +171,9 @@ class CoverRowDelegate(QStyledItemDelegate):
         painter.restore()
 
     @classmethod
-    def _paint_section_header(cls, painter: QPainter, rect: QRect, text: str, base_font: QFont) -> None:
+    def _paint_section_header(
+        cls, painter: QPainter, rect: QRect, text: str, base_font: QFont
+    ) -> None:
         painter.fillRect(rect, QColor("#000000"))
         f = QFont(base_font)
         cls._set_font_size(f, cls._base_pt(base_font) + 3)
@@ -159,12 +181,18 @@ class CoverRowDelegate(QStyledItemDelegate):
         painter.setFont(f)
         painter.setPen(QColor("#FFFFFF"))
         text_rect = QRect(rect.left(), rect.top() + 8, rect.width(), rect.height() - 12)
-        painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, str(text))
+        painter.drawText(
+            text_rect,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            str(text),
+        )
         painter.setPen(_SEPARATOR_COLOR)
         painter.drawLine(rect.left(), rect.bottom(), rect.right(), rect.bottom())
 
     @classmethod
-    def _paint_mosaic(cls, painter: QPainter, rect: QRect, thumb_paths: list, base_font: QFont) -> None:
+    def _paint_mosaic(
+        cls, painter: QPainter, rect: QRect, thumb_paths: list, base_font: QFont
+    ) -> None:
         tile_w = rect.width() // 2
         tile_h = rect.height() // 2
         for i in range(4):

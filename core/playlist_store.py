@@ -41,7 +41,7 @@ class PlaylistStore(QObject):
         return list(self._locations)
 
     def set_locations(self, locations: List[str]) -> None:
-        self._locations = [l for l in locations if l]
+        self._locations = [location for location in locations if location]
         self.changed.emit()
 
     def _collect_entries(self) -> List[Tuple[str, str]]:
@@ -50,37 +50,14 @@ class PlaylistStore(QObject):
         seen_paths: set = set()
         entries: List[Tuple[str, str]] = []
 
-        def _try_add(path: str) -> None:
-            ap = os.path.abspath(path)
-            if ap in seen_paths:
-                return
-            if not os.path.isfile(ap):
-                return
-            if not ap.lower().endswith((".m3u", ".m3u8")):
-                return
-            name = os.path.splitext(os.path.basename(ap))[0]
-            if name in seen_names:
-                return
-            seen_paths.add(ap)
-            seen_names.add(name)
-            entries.append((name, ap))
-
+        sources = self._locations
         if os.path.isdir(self._default_dir):
-            try:
-                for f in sorted(os.listdir(self._default_dir)):
-                    _try_add(os.path.join(self._default_dir, f))
-            except OSError:
-                pass
-
-        for loc in self._locations:
-            if os.path.isfile(loc):
-                _try_add(loc)
-            elif os.path.isdir(loc):
-                try:
-                    for f in sorted(os.listdir(loc)):
-                        _try_add(os.path.join(loc, f))
-                except OSError:
-                    pass
+            sources = [self._default_dir, *sources]
+        for source in sources:
+            for path in _playlist_files(source):
+                entry = _playlist_entry(path, seen_names, seen_paths)
+                if entry is not None:
+                    entries.append(entry)
 
         return entries
 
@@ -156,3 +133,32 @@ _INVALID_FN_CHARS = '<>:"/\\|?*'
 def _safe_filename(name: str) -> str:
     s = "".join("_" if c in _INVALID_FN_CHARS else c for c in name).strip()
     return s or "untitled"
+
+
+def _playlist_files(source: str) -> List[str]:
+    if os.path.isfile(source):
+        return [source]
+    if not os.path.isdir(source):
+        return []
+    try:
+        return [os.path.join(source, name) for name in sorted(os.listdir(source))]
+    except OSError:
+        return []
+
+
+def _playlist_entry(
+    path: str,
+    seen_names: set,
+    seen_paths: set,
+) -> Optional[Tuple[str, str]]:
+    absolute_path = os.path.abspath(path)
+    if absolute_path in seen_paths or not os.path.isfile(absolute_path):
+        return None
+    if not absolute_path.lower().endswith((".m3u", ".m3u8")):
+        return None
+    name = os.path.splitext(os.path.basename(absolute_path))[0]
+    if name in seen_names:
+        return None
+    seen_paths.add(absolute_path)
+    seen_names.add(name)
+    return name, absolute_path

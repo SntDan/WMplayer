@@ -8,8 +8,8 @@ from typing import List, Optional
 
 from PyQt6.QtCore import (
     QObject,
-    QSize,
     QRunnable,
+    QSize,
     Qt,
     QThreadPool,
     QTimer,
@@ -29,20 +29,20 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from core import lrc as lrc_mod
+from core import m3u
 from core.audio_engine import AudioEngine
 from core.config import (
-    Config,
     LIBRARY_CACHE_PATH,
     QUEUE_CACHE_PATH,
     QUEUE_ORIGINAL_CACHE_PATH,
+    Config,
     default_playlists_dir,
 )
 from core.library import Library
 from core.metadata import read_metadata
-from core.playlist import PlayMode, Playlist, RepeatMode
+from core.playlist import Playlist, PlayMode, RepeatMode
 from core.playlist_store import PlaylistStore
-from core import m3u
-from core import lrc as lrc_mod
 
 from .albums_panel import AlbumsPanel
 from .artists_panel import ArtistsPanel
@@ -125,13 +125,20 @@ class _MediaKeyHook(QObject):
                     ("dwExtraInfo", ctypes.c_void_p),
                 ]
 
-            hook_proc = ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM)
+            hook_proc = ctypes.WINFUNCTYPE(
+                ctypes.c_long, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM
+            )
             user32 = ctypes.windll.user32
             kernel32 = ctypes.windll.kernel32
 
             def _proc(n_code, w_param, l_param):
-                if n_code == 0 and int(w_param) in (self._WM_KEYDOWN, self._WM_SYSKEYDOWN):
-                    data = ctypes.cast(l_param, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
+                if n_code == 0 and int(w_param) in (
+                    self._WM_KEYDOWN,
+                    self._WM_SYSKEYDOWN,
+                ):
+                    data = ctypes.cast(
+                        l_param, ctypes.POINTER(KBDLLHOOKSTRUCT)
+                    ).contents
                     command = self._VK_TO_COMMAND.get(int(data.vkCode))
                     if command is not None:
                         self.command.emit(command)
@@ -163,7 +170,14 @@ class _Segmented(QWidget):
 
         self._group = QButtonGroup(self)
         self._group.setExclusive(True)
-        self._label_keys = ["library", "artists", "albums", "queue", "lyrics", "playlists"]
+        self._label_keys = [
+            "library",
+            "artists",
+            "albums",
+            "queue",
+            "lyrics",
+            "playlists",
+        ]
         for i, key in enumerate(self._label_keys):
             b = QPushButton(tr(key))
             b.setCheckable(True)
@@ -203,8 +217,8 @@ QPushButton:checked {
 }
 """
 
-class MainWindow(QMainWindow):
 
+class MainWindow(QMainWindow):
     VIEW_LIBRARY = 0
     VIEW_ARTISTS = 1
     VIEW_ALBUMS = 2
@@ -275,12 +289,12 @@ class MainWindow(QMainWindow):
         self.queue_panel = QueuePanel(self._playlist)
         self.playlists_panel = PlaylistsPanel(self._store)
         self.lyrics_panel = LyricsPanel()
-        self.stack.addWidget(self.library_panel)      # 0
-        self.stack.addWidget(self.artists_panel)      # 1
-        self.stack.addWidget(self.albums_panel)       # 2
-        self.stack.addWidget(self.queue_panel)         # 3
-        self.stack.addWidget(self.lyrics_panel)        # 4
-        self.stack.addWidget(self.playlists_panel)    # 5
+        self.stack.addWidget(self.library_panel)  # 0
+        self.stack.addWidget(self.artists_panel)  # 1
+        self.stack.addWidget(self.albums_panel)  # 2
+        self.stack.addWidget(self.queue_panel)  # 3
+        self.stack.addWidget(self.lyrics_panel)  # 4
+        self.stack.addWidget(self.playlists_panel)  # 5
         self.stack.setCurrentIndex(self.VIEW_QUEUE)
         rv.addWidget(self.stack, 1)
 
@@ -320,31 +334,43 @@ class MainWindow(QMainWindow):
         self._playlist.changed.connect(self._on_playlist_changed)
         self._playlist.shuffled_changed.connect(self.player_panel.set_shuffled)
         self._playlist.repeat_changed.connect(self.player_panel.set_repeat)
-        self._playlist.shuffled_changed.connect(lambda _shuffled: self._preload_next_track())
-        self._playlist.repeat_changed.connect(lambda _repeat: self._preload_next_track())
+        self._playlist.shuffled_changed.connect(
+            lambda _shuffled: self._preload_next_track()
+        )
+        self._playlist.repeat_changed.connect(
+            lambda _repeat: self._preload_next_track()
+        )
 
         self.queue_panel.track_double_clicked.connect(self._play_index)
         self.queue_panel.remove_requested.connect(self._on_remove_track)
         self.queue_panel.clear_requested.connect(self._on_clear_queue)
-        self.queue_panel.save_as_playlist_requested.connect(self._on_save_queue_as_playlist)
+        self.queue_panel.save_as_playlist_requested.connect(
+            self._on_save_queue_as_playlist
+        )
 
         self.library_panel.play_paths_now.connect(self._play_paths_now)
         self.library_panel.enqueue_paths.connect(self._enqueue_paths)
-        self.library_panel.add_paths_to_playlist.connect(self._add_paths_to_some_playlist)
+        self.library_panel.add_paths_to_playlist.connect(
+            self._add_paths_to_some_playlist
+        )
         self.library_panel.open_artist_requested.connect(self._open_artist_from_search)
         self.library_panel.open_album_requested.connect(self._open_album_from_search)
         self.library_panel.rescan_requested.connect(self._rescan_library)
 
-        self.albums_panel.play_paths_now.connect(self._play_paths_now)
         self.albums_panel.play_paths_sequential.connect(self._play_paths_sequential_now)
         self.albums_panel.enqueue_paths.connect(self._enqueue_paths)
-        self.albums_panel.add_paths_to_playlist.connect(self._add_paths_to_some_playlist)
+        self.albums_panel.add_paths_to_playlist.connect(
+            self._add_paths_to_some_playlist
+        )
 
-        self.artists_panel.play_paths_now.connect(self._play_paths_now)
-        self.artists_panel.play_paths_sequential.connect(self._play_paths_sequential_now)
+        self.artists_panel.play_paths_sequential.connect(
+            self._play_paths_sequential_now
+        )
         self.artists_panel.play_paths_shuffled.connect(self._play_paths_shuffled_now)
         self.artists_panel.enqueue_paths.connect(self._enqueue_paths)
-        self.artists_panel.add_paths_to_playlist.connect(self._add_paths_to_some_playlist)
+        self.artists_panel.add_paths_to_playlist.connect(
+            self._add_paths_to_some_playlist
+        )
 
         self.playlists_panel.open_playlist.connect(self._on_open_playlist)
         self.playlists_panel.rename_playlist.connect(self._on_rename_playlist)
@@ -353,7 +379,9 @@ class MainWindow(QMainWindow):
         self.lyrics_panel.seek_to_ms.connect(self._engine.seek)
 
         def _sc(seq, fn):
-            s = QShortcut(QKeySequence(seq), self); s.activated.connect(fn); return s
+            s = QShortcut(QKeySequence(seq), self)
+            s.activated.connect(fn)
+            return s
 
         _sc("Space", self._toggle_play)
         _sc(Qt.Key.Key_MediaPlay, self._toggle_play)
@@ -361,8 +389,14 @@ class MainWindow(QMainWindow):
         _sc(Qt.Key.Key_MediaPrevious, self._play_prev)
         _sc("Right", lambda: self._engine.seek(self._engine.get_position() + 5000))
         _sc("Left", lambda: self._engine.seek(self._engine.get_position() - 5000))
-        _sc("Up", lambda: self._engine.set_volume(min(100, self._engine.get_volume() + 5)))
-        _sc("Down", lambda: self._engine.set_volume(max(0, self._engine.get_volume() - 5)))
+        _sc(
+            "Up",
+            lambda: self._engine.set_volume(min(100, self._engine.get_volume() + 5)),
+        )
+        _sc(
+            "Down",
+            lambda: self._engine.set_volume(max(0, self._engine.get_volume() - 5)),
+        )
 
     def _handle_media_app_command(self, command: int) -> bool:
         now = time.monotonic()
@@ -442,41 +476,57 @@ class MainWindow(QMainWindow):
 
     def _restore_state(self) -> None:
         self._engine.set_volume(int(self._config.get("volume", 80)))
+        self._restore_playback_mode()
+        self._restore_queue()
+
+        if len(self._library) == 0 and self._library.folders:
+            self._library.scan_async()
+
+    def _restore_playback_mode(self) -> None:
         if self._config.has("shuffled") or self._config.has("repeat"):
             try:
-                self._playlist.set_repeat(RepeatMode(self._config.get("repeat", "none")))
+                self._playlist.set_repeat(
+                    RepeatMode(self._config.get("repeat", "none"))
+                )
             except Exception:
                 self._playlist.set_repeat(RepeatMode.NONE)
             self._playlist.set_shuffled(bool(self._config.get("shuffled", False)))
         else:
             try:
-                self._playlist.set_mode(PlayMode(self._config.get("play_mode", "sequential")))
+                self._playlist.set_mode(
+                    PlayMode(self._config.get("play_mode", "sequential"))
+                )
             except Exception:
                 self._playlist.set_mode(PlayMode.SEQUENTIAL)
 
-        if os.path.isfile(QUEUE_CACHE_PATH):
-            paths = m3u.parse_file(QUEUE_CACHE_PATH)
-            original_paths: Optional[List[str]] = None
-            if os.path.isfile(QUEUE_ORIGINAL_CACHE_PATH):
-                original_paths = m3u.parse_file(QUEUE_ORIGINAL_CACHE_PATH)
+    def _restore_queue(self) -> None:
+        if not os.path.isfile(QUEUE_CACHE_PATH):
+            return
+        paths = m3u.parse_file(QUEUE_CACHE_PATH)
+        if not paths:
+            return
+        original_paths = (
+            m3u.parse_file(QUEUE_ORIGINAL_CACHE_PATH)
+            if os.path.isfile(QUEUE_ORIGINAL_CACHE_PATH)
+            else None
+        )
+        original_tracks = (
+            self._tracks_from_paths(original_paths) if original_paths else None
+        )
+        self._playlist.restore_with_tracks(
+            self._tracks_from_paths(paths), original_tracks
+        )
 
-            if paths:
-                tracks = self._tracks_from_paths(paths)
-                orig_tracks = self._tracks_from_paths(original_paths) if original_paths else None
-                self._playlist.restore_with_tracks(tracks, orig_tracks)
-                last = self._config.get("last_track_path", "")
-                if last:
-                    idx = self._playlist.find_index_by_path(last)
-                    if idx >= 0:
-                        self._autoplay_after_load = False
-                        self._playlist.set_current(idx)
-                        if self._config.get("auto_resume", True):
-                            pos = int(self._config.get("last_position_ms", 0))
-                            if pos > 0:
-                                self._engine.seek(pos)
-
-        if len(self._library) == 0 and self._library.folders:
-            self._library.scan_async()
+        last_path = self._config.get("last_track_path", "")
+        index = self._playlist.find_index_by_path(last_path) if last_path else -1
+        if index < 0:
+            return
+        self._autoplay_after_load = False
+        self._playlist.set_current(index)
+        if self._config.get("auto_resume", True):
+            position_ms = int(self._config.get("last_position_ms", 0))
+            if position_ms > 0:
+                self._engine.seek(position_ms)
 
     def resizeEvent(self, e):  # noqa: N802
         super().resizeEvent(e)
@@ -499,23 +549,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, e):  # noqa: N802
         if not self._config.factory_reset_pending:
-            try:
-                self._config.set("volume", self._engine.get_volume())
-                self._config.set("shuffled", self._playlist.shuffled)
-                self._config.set("repeat", self._playlist.repeat.value)
-                self._config.set("play_mode", self._playlist.mode.value)
-                self._config.set("last_position_ms", self._engine.get_position())
-                cur = self._playlist.current
-                self._config.set("last_track_path", cur.path if cur else "")
-                self._config.save()
-                m3u.write_file(QUEUE_CACHE_PATH, "queue", self._playlist.paths)
-                orig_paths = self._playlist.original_paths
-                if orig_paths is not None:
-                    m3u.write_file(QUEUE_ORIGINAL_CACHE_PATH, "queue_original", orig_paths)
-                elif os.path.isfile(QUEUE_ORIGINAL_CACHE_PATH):
-                    os.remove(QUEUE_ORIGINAL_CACHE_PATH)
-            except Exception:
-                pass
+            self._save_state()
         try:
             self._media_key_hook.close()
         except Exception:
@@ -525,6 +559,28 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
         super().closeEvent(e)
+
+    def _save_state(self) -> None:
+        try:
+            self._config.set("volume", self._engine.get_volume())
+            self._config.set("shuffled", self._playlist.shuffled)
+            self._config.set("repeat", self._playlist.repeat.value)
+            self._config.set("play_mode", self._playlist.mode.value)
+            self._config.set("last_position_ms", self._engine.get_position())
+            current = self._playlist.current
+            self._config.set("last_track_path", current.path if current else "")
+            self._config.save()
+            m3u.write_file(QUEUE_CACHE_PATH, "queue", self._playlist.paths)
+            self._save_original_queue()
+        except Exception:
+            pass
+
+    def _save_original_queue(self) -> None:
+        original_paths = self._playlist.original_paths
+        if original_paths is not None:
+            m3u.write_file(QUEUE_ORIGINAL_CACHE_PATH, "queue_original", original_paths)
+        elif os.path.isfile(QUEUE_ORIGINAL_CACHE_PATH):
+            os.remove(QUEUE_ORIGINAL_CACHE_PATH)
 
     def _toggle_play(self) -> None:
         if self._playlist.current_index < 0:
@@ -555,7 +611,7 @@ class MainWindow(QMainWindow):
 
     def _on_backend_track_changed(self, path: str) -> None:
         idx = self._playlist.find_index_by_path(path)
-        if idx is None or idx < 0 or idx == self._playlist.current_index:
+        if idx < 0 or idx == self._playlist.current_index:
             return
         self._autoplay_after_load = self._engine.is_playing()
         self._playlist.set_current(idx)
@@ -664,7 +720,7 @@ class MainWindow(QMainWindow):
             self.player_panel.cover.set_cover(cover)
 
     def _on_remove_track(self, index: int) -> None:
-        was_current = (index == self._playlist.current_index)
+        was_current = index == self._playlist.current_index
         self._playlist.remove(index)
         if was_current:
             if len(self._playlist) > 0:
@@ -679,7 +735,9 @@ class MainWindow(QMainWindow):
     def _on_clear_queue(self) -> None:
         if len(self._playlist) == 0:
             return
-        ans = QMessageBox.question(self, tr("clear_queue_title"), tr("clear_queue_confirm"))
+        ans = QMessageBox.question(
+            self, tr("clear_queue_title"), tr("clear_queue_confirm")
+        )
         if ans == QMessageBox.StandardButton.Yes:
             self._engine.stop()
             self._engine.preload(None)
@@ -721,7 +779,9 @@ class MainWindow(QMainWindow):
         if len(self._playlist) > 0:
             self._play_index(new_start_index)
 
-    def _play_paths_sequential_now(self, paths: List[str], start_index: int = 0) -> None:
+    def _play_paths_sequential_now(
+        self, paths: List[str], start_index: int = 0
+    ) -> None:
         if not paths:
             return
         self._playlist.set_mode(PlayMode.SEQUENTIAL)
@@ -748,35 +808,49 @@ class MainWindow(QMainWindow):
             return
         names = self._store.list_names()
         if not names:
-            name, ok = QInputDialog.getText(self, tr("new_playlist"), tr("playlist_name"))
-            if not (ok and name.strip()):
+            name = self._prompt_new_playlist_name()
+            if name is None:
                 return
-            self._store.save(name.strip(), paths)
-            self.statusBar().showMessage(tr("create_playlist_status", name=name.strip(), n=len(paths)), 3000)
+            self._store.save(name, paths)
+            self.statusBar().showMessage(
+                tr("create_playlist_status", name=name, n=len(paths)), 3000
+            )
             return
         new_label = f"<{tr('new_playlist')}>"
-        names_with_new = [new_label] + names
         choice, ok = QInputDialog.getItem(
-            self, tr("join_playlist"), tr("select_playlist"), names_with_new, 0, False
+            self,
+            tr("join_playlist"),
+            tr("select_playlist"),
+            [new_label] + names,
+            0,
+            False,
         )
         if not ok:
             return
         if choice == new_label:
-            name, ok = QInputDialog.getText(self, tr("new_playlist"), tr("playlist_name"))
-            if not (ok and name.strip()):
-                return
-            self._store.save(name.strip(), paths)
-        else:
-            existing = self._store.load(choice)
-            seen = set(existing)
-            for p in paths:
-                if p not in seen:
-                    existing.append(p)
-                    seen.add(p)
-            self._store.save(choice, existing)
-            self.statusBar().showMessage(
-                tr("added_to_playlist_status", n=len(paths), name=choice), 3000
-            )
+            name = self._prompt_new_playlist_name()
+            if name is not None:
+                self._store.save(name, paths)
+            return
+        self._append_paths_to_playlist(choice, paths)
+
+    def _prompt_new_playlist_name(self) -> Optional[str]:
+        name, ok = QInputDialog.getText(self, tr("new_playlist"), tr("playlist_name"))
+        if not ok or not name.strip():
+            return None
+        return name.strip()
+
+    def _append_paths_to_playlist(self, name: str, paths: List[str]) -> None:
+        merged = self._store.load(name)
+        seen = set(merged)
+        for path in paths:
+            if path not in seen:
+                merged.append(path)
+                seen.add(path)
+        self._store.save(name, merged)
+        self.statusBar().showMessage(
+            tr("added_to_playlist_status", n=len(paths), name=name), 3000
+        )
 
     def _rescan_library(self) -> None:
         self._library.set_folders(self._config.library_folders_effective())
@@ -785,10 +859,11 @@ class MainWindow(QMainWindow):
     def _on_open_playlist(self, name: str) -> None:
         paths = self._store.load(name)
         if not paths:
-            QMessageBox.information(self, tr("empty_playlist_title"), tr("empty_playlist_msg", name=name))
+            QMessageBox.information(
+                self, tr("empty_playlist_title"), tr("empty_playlist_msg", name=name)
+            )
             return
-        self._playlist.replace_with_paths(paths)
-        self._config.set("last_playlist_name", name)
+        self._playlist.replace_with_tracks(self._tracks_from_paths(paths))
         self._switch_view(self.VIEW_QUEUE)
         if len(self._playlist) > 0:
             self._play_index(0)
@@ -800,7 +875,9 @@ class MainWindow(QMainWindow):
             )
             return
         if not self._store.rename(old, new):
-            QMessageBox.warning(self, tr("rename_failed_title"), tr("rename_failed_msg"))
+            QMessageBox.warning(
+                self, tr("rename_failed_title"), tr("rename_failed_msg")
+            )
 
     def _on_delete_playlist(self, name: str) -> None:
         if not self._store.is_writable(name):

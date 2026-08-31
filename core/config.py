@@ -47,15 +47,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "play_mode": "sequential",
     "last_position_ms": 0,
     "last_track_path": "",
-    "window_geometry": None,
     "auto_resume": True,
     "language": "en",
-
     "library_folders": [],
-
     "playlist_locations": [],
-
-    "last_playlist_name": "",
 }
 
 

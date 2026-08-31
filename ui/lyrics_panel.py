@@ -21,9 +21,9 @@ from PyQt6.QtWidgets import (
 )
 
 from core.lrc import Lyrics
+
 from .i18n import tr
 from .theme import Theme
-
 
 LYRIC_VISUAL_LEAD_MS = 240
 LYRIC_ANIMATE_MAX_LINE_JUMP = 2
@@ -100,7 +100,11 @@ class _LyricsCanvas(QWidget):
             target = self._block_top(index) + self._block_height(index) / 2
         else:
             target = 0.0
-        if animate and old_index >= 0 and abs(index - old_index) <= LYRIC_ANIMATE_MAX_LINE_JUMP:
+        if (
+            animate
+            and old_index >= 0
+            and abs(index - old_index) <= LYRIC_ANIMATE_MAX_LINE_JUMP
+        ):
             self._anim.stop()
             self._anim.setStartValue(self._scroll)
             self._anim.setEndValue(target)
@@ -110,11 +114,19 @@ class _LyricsCanvas(QWidget):
         self.update()
 
     def _font_for(self, index: int) -> QFont:
-        return self._font_active if (self._synced and index == self._current_index) else self._font
+        return (
+            self._font_active
+            if (self._synced and index == self._current_index)
+            else self._font
+        )
 
     def _ensure_heights(self) -> None:
         """Refresh cached lyric layout when inputs change."""
-        key = (id(self._lyrics) if self._lyrics else None, self._current_index, self.width())
+        key = (
+            id(self._lyrics) if self._lyrics else None,
+            self._current_index,
+            self.width(),
+        )
         if key == self._height_cache_key:
             return
         self._height_cache_key = key
@@ -299,7 +311,10 @@ class LyricsPanel(QWidget):
 
         header = QHBoxLayout()
         self.title_label = QLabel(tr("lyrics"))
-        f = QFont(); f.setPointSize(15); f.setBold(True); self.title_label.setFont(f)
+        f = QFont()
+        f.setPointSize(15)
+        f.setBold(True)
+        self.title_label.setFont(f)
         self.info_label = QLabel("")
         self.info_label.setStyleSheet("color: #9E9E9E;")
         header.addWidget(self.title_label)
@@ -336,7 +351,9 @@ class LyricsPanel(QWidget):
     def _on_line_clicked(self, idx: int) -> None:
         if self._lyrics and 0 <= idx < len(self._lyrics):
             line = self._lyrics.lines[idx]
-            self.seek_to_ms.emit(max(0, line.time_ms + self._lyrics.offset_ms - LYRIC_VISUAL_LEAD_MS))
+            self.seek_to_ms.emit(
+                max(0, line.time_ms + self._lyrics.offset_ms - LYRIC_VISUAL_LEAD_MS)
+            )
 
     def retranslate(self) -> None:
         self.title_label.setText(tr("lyrics"))

@@ -11,7 +11,6 @@ from PyQt6.QtGui import QImage
 
 from core.config import CONFIG_DIR
 
-
 THUMB_SIZE = 128
 THUMB_DIR = os.path.join(CONFIG_DIR, "thumbnails")
 
@@ -50,7 +49,8 @@ def ensure_thumb(track_path: str, cover_bytes: Optional[bytes]) -> Optional[str]
             open(out, "wb").close()
             return None
         scaled = img.scaled(
-            THUMB_SIZE, THUMB_SIZE,
+            THUMB_SIZE,
+            THUMB_SIZE,
             Qt.AspectRatioMode.KeepAspectRatioByExpanding,
             Qt.TransformationMode.SmoothTransformation,
         )

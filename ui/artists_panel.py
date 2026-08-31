@@ -1,18 +1,27 @@
-from typing import List, Optional, Dict
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from typing import Dict, List, Optional
+
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QVBoxLayout, QWidget, QStackedWidget
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
 )
+
 from core.library import Library
 from core.metadata import TrackMetadata
 from core.thumbnails import thumb_path_for
 from ui.i18n import tr
-from ui.list_delegates import CoverRowDelegate, ROLE_SUBTITLE, ROLE_THUMB_PATH
+from ui.list_delegates import ROLE_SUBTITLE, ROLE_THUMB_PATH, CoverRowDelegate
+from ui.list_helpers import connect_debounced_filter, filter_items_by_text
+
 
 class ArtistsPanel(QWidget):
-    play_paths_now = pyqtSignal(list, int)
     play_paths_sequential = pyqtSignal(list, int)
     play_paths_shuffled = pyqtSignal(list)
     enqueue_paths = pyqtSignal(list)
@@ -36,10 +45,13 @@ class ArtistsPanel(QWidget):
         l0 = QVBoxLayout(self.page_list)
         l0.setContentsMargins(20, 16, 20, 16)
         l0.setSpacing(10)
-        
+
         h0 = QHBoxLayout()
         self.title_label = QLabel(tr("artists"))
-        f = QFont(); f.setPointSize(15); f.setBold(True); self.title_label.setFont(f)
+        f = QFont()
+        f.setPointSize(15)
+        f.setBold(True)
+        self.title_label.setFont(f)
         h0.addWidget(self.title_label)
         h0.addStretch()
         self.artist_count = QLabel("0")
@@ -54,7 +66,9 @@ class ArtistsPanel(QWidget):
 
         self.list_artists = QListWidget()
         self.list_artists.setTextElideMode(Qt.TextElideMode.ElideRight)
-        self.list_artists.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.list_artists.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         self.list_artists.setUniformItemSizes(True)
         self.list_artists.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
         self.list_artists.setMouseTracking(True)
@@ -64,22 +78,26 @@ class ArtistsPanel(QWidget):
         self.stack.addWidget(self.page_list)
 
         from .albums_panel import AlbumsPanel
+
         self.albums_subpanel = AlbumsPanel(library=self._library, embedded=True)
-        self.albums_subpanel.play_paths_now.connect(self.play_paths_now.emit)
-        self.albums_subpanel.play_paths_sequential.connect(self.play_paths_sequential.emit)
+        self.albums_subpanel.play_paths_sequential.connect(
+            self.play_paths_sequential.emit
+        )
         self.albums_subpanel.play_paths_shuffled.connect(self.play_paths_shuffled.emit)
         self.albums_subpanel.enqueue_paths.connect(self.enqueue_paths.emit)
-        self.albums_subpanel.add_paths_to_playlist.connect(self.add_paths_to_playlist.emit)
-        self.albums_subpanel.back_to_artists_requested.connect(lambda: self.stack.setCurrentIndex(0))
+        self.albums_subpanel.add_paths_to_playlist.connect(
+            self.add_paths_to_playlist.emit
+        )
+        self.albums_subpanel.back_to_artists_requested.connect(
+            lambda: self.stack.setCurrentIndex(0)
+        )
         self.stack.addWidget(self.albums_subpanel)
 
     def _wire(self) -> None:
         self._library.tracks_changed.connect(self.refresh)
-        self._search_timer = QTimer(self)
-        self._search_timer.setSingleShot(True)
-        self._search_timer.setInterval(90)
-        self._search_timer.timeout.connect(lambda: self._apply_filter(self.search_box.text()))
-        self.search_box.textChanged.connect(lambda _text: self._search_timer.start())
+        self._search_timer = connect_debounced_filter(
+            self, self.search_box, self._apply_filter
+        )
         self.list_artists.itemClicked.connect(self._on_artist_clicked)
 
     def refresh(self) -> None:
@@ -91,7 +109,9 @@ class ArtistsPanel(QWidget):
             self._artists_tracks[artist].append(t)
 
         for artist in self._artists_tracks:
-            self._artists_tracks[artist].sort(key=lambda t: (t.album or "", t.title or ""))
+            self._artists_tracks[artist].sort(
+                key=lambda t: (t.album or "", t.title or "")
+            )
 
         self.list_artists.setUpdatesEnabled(False)
         self.list_artists.clear()
@@ -111,17 +131,9 @@ class ArtistsPanel(QWidget):
         self._apply_filter(self.search_box.text())
 
     def _apply_filter(self, text: str) -> None:
-        text = (text or "").strip().lower()
-        for i in range(self.list_artists.count()):
-            it = self.list_artists.item(i)
-            artist = it.data(Qt.ItemDataRole.UserRole)
-            if not text:
-                it.setHidden(False)
-            else:
-                it.setHidden(text not in artist.lower())
+        filter_items_by_text(self.list_artists, text)
 
     def show_artist(self, artist: str) -> None:
-        self._current_artist = artist
         self.albums_subpanel.set_artist_filter(artist)
         self.stack.setCurrentIndex(1)
 

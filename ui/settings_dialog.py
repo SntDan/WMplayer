@@ -28,14 +28,18 @@ from PyQt6.QtWidgets import (
 )
 
 from core.config import (
-    Config, DEFAULT_CONFIG,
-    LIBRARY_CACHE_PATH, QUEUE_CACHE_PATH, QUEUE_ORIGINAL_CACHE_PATH,
-    default_library_dir, default_playlists_dir,
+    DEFAULT_CONFIG,
+    LIBRARY_CACHE_PATH,
+    QUEUE_CACHE_PATH,
+    QUEUE_ORIGINAL_CACHE_PATH,
+    Config,
+    default_library_dir,
+    default_playlists_dir,
 )
 from core.thumbnails import THUMB_DIR
 from ui.i18n import language, set_language, tr
-from ui.theme import BTN_QSS as _BTN_QSS, PRIMARY_BTN_QSS as _PRIMARY_BTN_QSS
-
+from ui.theme import BTN_QSS as _BTN_QSS
+from ui.theme import PRIMARY_BTN_QSS as _PRIMARY_BTN_QSS
 
 _LOCKED_DEFAULT_QSS = (
     "QLabel{background:#0a0a0a; border:1px solid #222; border-radius:3px;"
@@ -68,9 +72,7 @@ class SettingsDialog(QDialog):
         tabs.addTab(self._build_general_tab(), tr("general"))
         layout.addWidget(tabs, 1)
 
-        about = QLabel(
-            tr("about")
-        )
+        about = QLabel(tr("about"))
         about.setWordWrap(True)
         layout.addWidget(about)
 
@@ -153,9 +155,7 @@ class SettingsDialog(QDialog):
         b_add_file.clicked.connect(self._add_playlist_file)
         b_remove.clicked.connect(lambda: self._remove_selected(self.lst_playlist_locs))
 
-        hint = QLabel(
-            tr("playlist_hint")
-        )
+        hint = QLabel(tr("playlist_hint"))
         hint.setWordWrap(True)
         v.addWidget(hint)
         return w
@@ -208,8 +208,10 @@ class SettingsDialog(QDialog):
             lambda val: self.lbl_vol.setText(f"{val}%")
         )
         wrap = QWidget()
-        h = QHBoxLayout(wrap); h.setContentsMargins(0, 0, 0, 0)
-        h.addWidget(self.slider_vol, 1); h.addWidget(self.lbl_vol)
+        h = QHBoxLayout(wrap)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.addWidget(self.slider_vol, 1)
+        h.addWidget(self.lbl_vol)
         form.addRow(tr("volume"), wrap)
 
         self.chk_resume = QCheckBox(tr("auto_resume"))
@@ -238,7 +240,8 @@ class SettingsDialog(QDialog):
 
     def _on_factory_reset(self) -> None:
         reply = QMessageBox.question(
-            self, tr("factory_reset_title"),
+            self,
+            tr("factory_reset_title"),
             tr("factory_reset_confirm"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Cancel,
@@ -256,6 +259,7 @@ class SettingsDialog(QDialog):
         try:
             if os.path.isdir(THUMB_DIR):
                 import shutil
+
                 shutil.rmtree(THUMB_DIR, ignore_errors=True)
         except Exception:
             pass
@@ -283,7 +287,9 @@ class SettingsDialog(QDialog):
             lst.takeItem(lst.row(it))
 
     def collected_library_folders(self) -> List[str]:
-        return [self.lst_folders.item(i).text() for i in range(self.lst_folders.count())]
+        return [
+            self.lst_folders.item(i).text() for i in range(self.lst_folders.count())
+        ]
 
     def collected_playlist_locations(self) -> List[str]:
         return [

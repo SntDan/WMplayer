@@ -14,8 +14,8 @@ from core.thumbnails import ensure_thumb, thumb_exists
 
 
 class _ScanSignals(QObject):
-    progress = pyqtSignal(int, int)          # done, total
-    finished = pyqtSignal(list)              # List[TrackMetadata]
+    progress = pyqtSignal(int, int)  # done, total
+    finished = pyqtSignal(list)  # List[TrackMetadata]
 
 
 class _ScanRunnable(QRunnable):
@@ -31,20 +31,7 @@ class _ScanRunnable(QRunnable):
         self._signals = signals
 
     def run(self) -> None:
-        files: List[str] = []
-        seen = set()
-        for folder in self._folders:
-            if not folder or not os.path.isdir(folder):
-                continue
-            for root, _dirs, fs in os.walk(folder):
-                for f in fs:
-                    p = os.path.join(root, f)
-                    if p in seen:
-                        continue
-                    if is_supported(p):
-                        seen.add(p)
-                        files.append(p)
-
+        files = _discover_audio_files(self._folders)
         results: List[TrackMetadata] = []
         total = len(files)
         for i, path in enumerate(files):
@@ -52,51 +39,93 @@ class _ScanRunnable(QRunnable):
                 mtime = os.path.getmtime(path)
             except OSError:
                 continue
-
-            cached = self._cache.get(path)
-            need_thumb = not thumb_exists(path)
-
-            if cached and abs(cached.get("mtime", 0) - mtime) < 1 and "track_number" in cached:
-                md = TrackMetadata(
-                    path=path,
-                    title=cached.get("title", ""),
-                    artist=cached.get("artist", ""),
-                    album=cached.get("album", ""),
-                    duration_ms=int(cached.get("duration_ms", 0)),
-                    sample_rate=int(cached.get("sample_rate", 0)),
-                    bits_per_sample=int(cached.get("bits_per_sample", 0)),
-                    track_number=int(cached.get("track_number", 0)),
-                )
-                if need_thumb:
-                    try:
-                        cover_md = read_metadata(path, with_cover=True)
-                        ensure_thumb(path, cover_md.cover)
-                    except Exception:
-                        pass
-            else:
-                try:
-                    md = read_metadata(path, with_cover=need_thumb)
-                    if need_thumb:
-                        ensure_thumb(path, md.cover)
-                        md.cover = None
-                except Exception:
-                    continue
-            results.append(md)
+            metadata = _metadata_for_scan(path, mtime, self._cache.get(path))
+            if metadata is None:
+                continue
+            results.append(metadata)
 
             if (i + 1) % 25 == 0 or (i + 1) == total:
                 self._signals.progress.emit(i + 1, total)
             if (i + 1) % 10 == 0:
                 time.sleep(0.001)
 
-        results.sort(key=lambda t: (
-            (t.title or "").lower(),
-            (t.artist or "").lower(),
-        ))
+        results.sort(
+            key=lambda t: (
+                (t.title or "").lower(),
+                (t.artist or "").lower(),
+            )
+        )
         self._signals.finished.emit(results)
 
 
-class Library(QObject):
+def _discover_audio_files(folders: List[str]) -> List[str]:
+    """Return supported files from the configured folders without duplicates."""
+    files: List[str] = []
+    seen = set()
+    for folder in folders:
+        if not folder or not os.path.isdir(folder):
+            continue
+        for root, _dirs, names in os.walk(folder):
+            for name in names:
+                path = os.path.join(root, name)
+                if path in seen or not is_supported(path):
+                    continue
+                seen.add(path)
+                files.append(path)
+    return files
 
+
+def _metadata_for_scan(
+    path: str,
+    mtime: float,
+    cached: Optional[dict],
+) -> Optional[TrackMetadata]:
+    """Load one scan result, reusing cache data and creating its thumbnail."""
+    needs_thumbnail = not thumb_exists(path)
+    if _cache_entry_is_current(cached, mtime):
+        metadata = _metadata_from_cache(path, cached)
+        if needs_thumbnail:
+            _create_thumbnail(path)
+        return metadata
+
+    try:
+        metadata = read_metadata(path, with_cover=needs_thumbnail)
+        if needs_thumbnail:
+            ensure_thumb(path, metadata.cover)
+            metadata.cover = None
+        return metadata
+    except Exception:
+        return None
+
+
+def _cache_entry_is_current(cached: Optional[dict], mtime: float) -> bool:
+    return bool(
+        cached and abs(cached.get("mtime", 0) - mtime) < 1 and "track_number" in cached
+    )
+
+
+def _metadata_from_cache(path: str, cached: dict) -> TrackMetadata:
+    return TrackMetadata(
+        path=path,
+        title=cached.get("title", ""),
+        artist=cached.get("artist", ""),
+        album=cached.get("album", ""),
+        duration_ms=int(cached.get("duration_ms", 0)),
+        sample_rate=int(cached.get("sample_rate", 0)),
+        bits_per_sample=int(cached.get("bits_per_sample", 0)),
+        track_number=int(cached.get("track_number", 0)),
+    )
+
+
+def _create_thumbnail(path: str) -> None:
+    try:
+        metadata = read_metadata(path, with_cover=True)
+        ensure_thumb(path, metadata.cover)
+    except Exception:
+        pass
+
+
+class Library(QObject):
     folders_changed = pyqtSignal()
     tracks_changed = pyqtSignal()
     scan_progress = pyqtSignal(int, int)
@@ -150,17 +179,6 @@ class Library(QObject):
                 best[key] = t
         self._display_tracks = [best[k] for k in order]
 
-    def search(self, query: str) -> List[TrackMetadata]:
-        q = (query or "").strip().lower()
-        if not q:
-            return list(self._display_tracks)
-        return [
-            t for t in self._display_tracks
-            if q in (t.title or "").lower()
-            or q in (t.artist or "").lower()
-            or q in (t.album or "").lower()
-        ]
-
     def set_folders(self, folders: List[str]) -> None:
         cleaned: List[str] = []
         seen = set()
@@ -174,25 +192,6 @@ class Library(QObject):
             cleaned.append(f)
         self._folders = cleaned
         self.folders_changed.emit()
-
-    def add_folder(self, folder: str) -> bool:
-        if not folder or not os.path.isdir(folder):
-            return False
-        folder = os.path.abspath(folder)
-        if folder in self._folders:
-            return False
-        self._folders.append(folder)
-        self.folders_changed.emit()
-        return True
-
-    def remove_folder(self, folder: str) -> None:
-        folder = os.path.abspath(folder)
-        if folder in self._folders:
-            self._folders.remove(folder)
-            self.folders_changed.emit()
-
-    def is_scanning(self) -> bool:
-        return self._scanning
 
     def scan_async(self) -> None:
         if self._scanning:
@@ -244,16 +243,18 @@ class Library(QObject):
             path = entry.get("path", "")
             if not path or not os.path.isfile(path):
                 continue
-            self._tracks.append(TrackMetadata(
-                path=path,
-                title=entry.get("title", ""),
-                artist=entry.get("artist", ""),
-                album=entry.get("album", ""),
-                duration_ms=int(entry.get("duration_ms", 0)),
-                sample_rate=int(entry.get("sample_rate", 0)),
-                bits_per_sample=int(entry.get("bits_per_sample", 0)),
-                track_number=int(entry.get("track_number", 0)),
-            ))
+            self._tracks.append(
+                TrackMetadata(
+                    path=path,
+                    title=entry.get("title", ""),
+                    artist=entry.get("artist", ""),
+                    album=entry.get("album", ""),
+                    duration_ms=int(entry.get("duration_ms", 0)),
+                    sample_rate=int(entry.get("sample_rate", 0)),
+                    bits_per_sample=int(entry.get("bits_per_sample", 0)),
+                    track_number=int(entry.get("track_number", 0)),
+                )
+            )
 
     def _save_cache(self) -> None:
         try:

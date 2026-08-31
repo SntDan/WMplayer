@@ -21,11 +21,10 @@ from PyQt6.QtWidgets import (
 from core.playlist_store import PlaylistStore
 from core.thumbnails import thumb_path_for
 from ui.i18n import tr
-from ui.list_delegates import CoverRowDelegate, ROLE_SUBTITLE, ROLE_THUMB_PATHS
+from ui.list_delegates import ROLE_SUBTITLE, ROLE_THUMB_PATHS, CoverRowDelegate
 
 
 class PlaylistsPanel(QWidget):
-
     open_playlist = pyqtSignal(str)
     rename_playlist = pyqtSignal(str, str)  # (old, new)
     delete_playlist = pyqtSignal(str)
@@ -44,7 +43,10 @@ class PlaylistsPanel(QWidget):
 
         header = QHBoxLayout()
         self.title_label = QLabel(tr("playlists"))
-        f = QFont(); f.setPointSize(15); f.setBold(True); self.title_label.setFont(f)
+        f = QFont()
+        f.setPointSize(15)
+        f.setBold(True)
+        self.title_label.setFont(f)
         self.count_label = QLabel(tr("items_count", n=0))
         self.count_label.setStyleSheet("color: #9E9E9E;")
         header.addWidget(self.title_label)
@@ -74,7 +76,9 @@ class PlaylistsPanel(QWidget):
         self.list.customContextMenuRequested.connect(self._on_context_menu)
 
     def refresh(self) -> None:
-        self.path_label.setText(tr("default_playlist_dir", path=self._store.default_dir))
+        self.path_label.setText(
+            tr("default_playlist_dir", path=self._store.default_dir)
+        )
         self.list.clear()
         names = self._store.list_names()
         for name in names:
@@ -104,7 +108,9 @@ class PlaylistsPanel(QWidget):
         if act == a_open:
             self.open_playlist.emit(name)
         elif act == a_rename:
-            new, ok = QInputDialog.getText(self, tr("rename"), tr("new_name"), text=name)
+            new, ok = QInputDialog.getText(
+                self, tr("rename"), tr("new_name"), text=name
+            )
             if ok and new.strip() and new.strip() != name:
                 self.rename_playlist.emit(name, new.strip())
         elif act == a_del:

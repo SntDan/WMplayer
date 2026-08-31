@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QHBoxLayout,
@@ -19,18 +19,18 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ui.theme import BTN_QSS as _BTN_QSS
-
 from core.playlist import Playlist
 from core.thumbnails import thumb_path_for
 from ui.i18n import tr
 from ui.list_delegates import (
-    CoverRowDelegate,
     ROLE_IS_HR,
     ROLE_IS_PLAYING,
     ROLE_SUBTITLE,
     ROLE_THUMB_PATH,
+    CoverRowDelegate,
 )
+from ui.list_helpers import connect_debounced_filter
+from ui.theme import BTN_QSS as _BTN_QSS
 
 
 class QueuePanel(QWidget):
@@ -57,7 +57,10 @@ class QueuePanel(QWidget):
 
         header = QHBoxLayout()
         self.title_label = QLabel(tr("queue"))
-        f = QFont(); f.setPointSize(15); f.setBold(True); self.title_label.setFont(f)
+        f = QFont()
+        f.setPointSize(15)
+        f.setBold(True)
+        self.title_label.setFont(f)
         self.count_label = QLabel(tr("tracks_count", n=0))
         self.count_label.setStyleSheet("color: #9E9E9E;")
         header.addWidget(self.title_label)
@@ -98,11 +101,9 @@ class QueuePanel(QWidget):
         self.list.customContextMenuRequested.connect(self._on_context_menu)
         self.btn_save.clicked.connect(self._on_save)
         self.btn_clear.clicked.connect(self.clear_requested.emit)
-        self._search_timer = QTimer(self)
-        self._search_timer.setSingleShot(True)
-        self._search_timer.setInterval(90)
-        self._search_timer.timeout.connect(lambda: self._apply_filter(self.search.text()))
-        self.search.textChanged.connect(lambda _text: self._search_timer.start())
+        self._search_timer = connect_debounced_filter(
+            self, self.search, self._apply_filter
+        )
 
         sc = QShortcut(QKeySequence("Delete"), self.list)
         sc.activated.connect(self._delete_selected)
@@ -171,7 +172,11 @@ class QueuePanel(QWidget):
     def _delete_selected(self) -> None:
         items = self.list.selectedItems()
         idxs = sorted(
-            [idx for idx in (it.data(Qt.ItemDataRole.UserRole) for it in items) if isinstance(idx, int)],
+            [
+                idx
+                for idx in (it.data(Qt.ItemDataRole.UserRole) for it in items)
+                if isinstance(idx, int)
+            ],
             reverse=True,
         )
         for i in idxs:
@@ -180,7 +185,9 @@ class QueuePanel(QWidget):
     def _on_save(self) -> None:
         if len(self._playlist) == 0:
             return
-        name, ok = QInputDialog.getText(self, tr("save_as_playlist"), tr("playlist_name"))
+        name, ok = QInputDialog.getText(
+            self, tr("save_as_playlist"), tr("playlist_name")
+        )
         if ok and name.strip():
             self.save_as_playlist_requested.emit(name.strip())
 

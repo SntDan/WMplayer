@@ -18,7 +18,9 @@ def _set_windows_app_id() -> None:
     try:
         import ctypes
 
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("WMplayer.WMplayer")
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            "WMplayer.WMplayer"
+        )
     except Exception:
         pass
 
@@ -44,6 +46,7 @@ def main() -> int:
     _set_windows_app_id()
 
     from PyQt6.QtWidgets import QApplication
+
     from ui.main_window import MainWindow
 
     QApplication.setApplicationName("WMplayer")

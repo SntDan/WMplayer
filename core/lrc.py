@@ -7,7 +7,6 @@ import re
 from dataclasses import dataclass
 from typing import List, Optional
 
-
 _TIME_TAG_RE = re.compile(r"\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]")
 _META_TAG_RE = re.compile(r"\[([a-zA-Z]+):([^\]]*)\]")
 
@@ -146,8 +145,10 @@ def find_lrc_for(audio_path: str) -> Optional[str]:
         try:
             stem_lower = stem.lower()
             for fname in os.listdir(folder):
-                if fname.lower().endswith(".lrc") and \
-                        os.path.splitext(fname)[0].lower() == stem_lower:
+                if (
+                    fname.lower().endswith(".lrc")
+                    and os.path.splitext(fname)[0].lower() == stem_lower
+                ):
                     return os.path.join(folder, fname)
         except OSError:
             pass

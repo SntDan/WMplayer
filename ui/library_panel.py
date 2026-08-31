@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import List, Optional
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QHBoxLayout,
@@ -22,19 +22,19 @@ from PyQt6.QtWidgets import (
 
 from core.library import Library
 from core.thumbnails import thumb_path_for
+from ui.i18n import tr
 from ui.list_delegates import (
-    CoverRowDelegate,
     ROLE_IS_HR,
     ROLE_SECTION_HEADER,
     ROLE_SUBTITLE,
     ROLE_THUMB_PATH,
+    CoverRowDelegate,
 )
-from ui.i18n import tr
+from ui.list_helpers import connect_debounced_filter, suspended_updates
 from ui.theme import BTN_QSS as _BTN_QSS
 
 
 class LibraryPanel(QWidget):
-
     play_paths_now = pyqtSignal(list, int)
     enqueue_paths = pyqtSignal(list)
     add_paths_to_playlist = pyqtSignal(list)
@@ -56,7 +56,10 @@ class LibraryPanel(QWidget):
 
         header = QHBoxLayout()
         self.title_label = QLabel(tr("library"))
-        f = QFont(); f.setPointSize(15); f.setBold(True); self.title_label.setFont(f)
+        f = QFont()
+        f.setPointSize(15)
+        f.setBold(True)
+        self.title_label.setFont(f)
         self.count_label = QLabel(tr("tracks_count", n=0))
         self.count_label.setStyleSheet("color: #9E9E9E;")
         header.addWidget(self.title_label)
@@ -105,25 +108,21 @@ class LibraryPanel(QWidget):
         self._library.scan_progress.connect(self._on_scan_progress)
         self._library.scan_finished.connect(self._on_scan_finished)
         self.btn_scan.clicked.connect(self.rescan_requested.emit)
-        self._search_timer = QTimer(self)
-        self._search_timer.setSingleShot(True)
-        self._search_timer.setInterval(90)
-        self._search_timer.timeout.connect(lambda: self._apply_filter(self.search.text()))
-        self.search.textChanged.connect(lambda _text: self._search_timer.start())
+        self._search_timer = connect_debounced_filter(
+            self, self.search, self._apply_filter
+        )
         self.list.itemDoubleClicked.connect(self._on_double_click)
         self.list.customContextMenuRequested.connect(self._on_context_menu)
 
     _ROLE_RESULT_KIND = Qt.ItemDataRole.UserRole + 10
     _ROLE_RESULT_PATHS = Qt.ItemDataRole.UserRole + 11
-    _ROLE_FILTER_HAY = Qt.ItemDataRole.UserRole + 12
 
     def refresh(self) -> None:
         self.count_label.setText(tr("tracks_count", n=len(self._library.tracks)))
         self._rebuild_results(self.search.text())
 
     def _rebuild_results(self, text: str) -> None:
-        self.list.setUpdatesEnabled(False)
-        try:
+        with suspended_updates(self.list):
             self.list.clear()
             tracks = self._library.tracks
             q = (text or "").strip().lower()
@@ -132,59 +131,41 @@ class LibraryPanel(QWidget):
                 self._add_song_rows(tracks)
                 return
 
-            artists = defaultdict(list)
-            albums = defaultdict(list)
-            for t in tracks:
-                artist = (t.artist or tr("unknown_artist")).strip() or tr("unknown_artist")
-                album = (t.album or tr("unknown_album")).strip() or tr("unknown_album")
-                artists[artist].append(t)
-                albums[(album, artist)].append(t)
-
-            artist_rows = [
-                (artist, sorted(items, key=lambda t: ((t.album or ""), (t.track_number if t.track_number > 0 else 9999), t.title or "")))
-                for artist, items in artists.items()
-                if not q or q in artist.lower()
-            ]
-            album_rows = [
-                (album, artist, sorted(items, key=lambda t: (t.track_number if t.track_number > 0 else 9999, t.title or "")))
-                for (album, artist), items in albums.items()
-                if not q or q in album.lower() or q in artist.lower()
-            ]
-            song_rows = [
-                t for t in tracks
-                if not q or q in f"{t.title or ''} {t.artist or ''} {t.album or ''}".lower()
-            ]
-
-            artist_rows.sort(key=lambda row: row[0].lower())
-            album_rows.sort(key=lambda row: (row[0].lower(), row[1].lower()))
-            song_rows.sort(key=lambda t: ((t.artist or "").lower(), (t.album or "").lower(), t.track_number if t.track_number > 0 else 9999, (t.title or "").lower()))
-
-            self._add_header(tr("artist_header", n=len(artist_rows)))
-            for artist, items in artist_rows:
-                albums_count = len({(t.album or tr("unknown_album")).strip() or tr("unknown_album") for t in items})
-                self._add_result_item(
-                    "artist",
-                    artist,
-                    tr("album_track_count", albums=albums_count, tracks=len(items)),
-                    items[0].path if items else "",
-                    [t.path for t in items],
-                )
-
-            self._add_header(tr("album_header", n=len(album_rows)))
-            for album, artist, items in album_rows:
-                self._add_result_item(
-                    "album",
-                    album,
-                    tr("artist_track_count", artist=artist, tracks=len(items)),
-                    items[0].path if items else "",
-                    [t.path for t in items],
-                    data=album,
-                )
-
+            artist_rows, album_rows, song_rows = _group_search_results(tracks, q)
+            self._add_artist_rows(artist_rows)
+            self._add_album_rows(album_rows)
             self._add_header(tr("song_header", n=len(song_rows)))
             self._add_song_rows(song_rows)
-        finally:
-            self.list.setUpdatesEnabled(True)
+
+    def _add_artist_rows(self, rows) -> None:
+        self._add_header(tr("artist_header", n=len(rows)))
+        unknown_album = tr("unknown_album")
+        for artist, tracks in rows:
+            album_count = len(
+                {
+                    (track.album or unknown_album).strip() or unknown_album
+                    for track in tracks
+                }
+            )
+            self._add_result_item(
+                "artist",
+                artist,
+                tr("album_track_count", albums=album_count, tracks=len(tracks)),
+                tracks[0].path if tracks else "",
+                [track.path for track in tracks],
+            )
+
+    def _add_album_rows(self, rows) -> None:
+        self._add_header(tr("album_header", n=len(rows)))
+        for album, artist, tracks in rows:
+            self._add_result_item(
+                "album",
+                album,
+                tr("artist_track_count", artist=artist, tracks=len(tracks)),
+                tracks[0].path if tracks else "",
+                [track.path for track in tracks],
+                data=album,
+            )
 
     def _add_song_rows(self, tracks) -> None:
         for t in tracks:
@@ -215,14 +196,22 @@ class LibraryPanel(QWidget):
         is_hr: bool = False,
     ) -> None:
         item = QListWidgetItem(title)
-        item.setData(Qt.ItemDataRole.UserRole, data if data is not None else title if kind != "song" else (paths[0] if paths else ""))
+        item.setData(
+            Qt.ItemDataRole.UserRole,
+            data
+            if data is not None
+            else title
+            if kind != "song"
+            else (paths[0] if paths else ""),
+        )
         item.setData(self._ROLE_RESULT_KIND, kind)
         item.setData(self._ROLE_RESULT_PATHS, paths)
-        item.setData(ROLE_THUMB_PATH, thumb_path_for(thumb_source_path) if thumb_source_path else "")
+        item.setData(
+            ROLE_THUMB_PATH,
+            thumb_path_for(thumb_source_path) if thumb_source_path else "",
+        )
         item.setData(ROLE_SUBTITLE, subtitle)
         item.setData(ROLE_IS_HR, is_hr)
-        hay = f"{title} {subtitle}".lower()
-        item.setData(self._ROLE_FILTER_HAY, hay)
         self.list.addItem(item)
 
     def _on_scan_started(self) -> None:
@@ -242,7 +231,9 @@ class LibraryPanel(QWidget):
         self.btn_scan.setEnabled(True)
 
     def _selected_paths(self) -> List[str]:
-        items = self.list.selectedItems() or ([self.list.currentItem()] if self.list.currentItem() else [])
+        items = self.list.selectedItems() or (
+            [self.list.currentItem()] if self.list.currentItem() else []
+        )
         paths: List[str] = []
         for item in items:
             if item.data(self._ROLE_RESULT_KIND) != "song":
@@ -270,22 +261,26 @@ class LibraryPanel(QWidget):
         if not path:
             return
 
-        visible_paths: List[str] = []
-        start_index = 0
-        for i in range(self.list.count()):
-            it = self.list.item(i)
-            if it.data(self._ROLE_RESULT_KIND) != "song":
-                continue
-            p = it.data(Qt.ItemDataRole.UserRole)
-            if p:
-                if p == path:
-                    start_index = len(visible_paths)
-                visible_paths.append(p)
-        
+        visible_paths, start_index = self._visible_song_paths(path)
         if visible_paths:
             self.play_paths_now.emit(visible_paths, start_index)
         else:
             self.play_paths_now.emit([path], 0)
+
+    def _visible_song_paths(self, selected_path: str) -> tuple[List[str], int]:
+        paths: List[str] = []
+        selected_index = 0
+        for index in range(self.list.count()):
+            item = self.list.item(index)
+            if item.data(self._ROLE_RESULT_KIND) != "song":
+                continue
+            path = item.data(Qt.ItemDataRole.UserRole)
+            if not path:
+                continue
+            if path == selected_path:
+                selected_index = len(paths)
+            paths.append(path)
+        return paths, selected_index
 
     def _on_context_menu(self, pos) -> None:
         item = self.list.itemAt(pos)
@@ -328,3 +323,59 @@ class LibraryPanel(QWidget):
         self.search.setPlaceholderText(tr("search_library"))
         self.btn_scan.setText(tr("scan_library"))
         self.refresh()
+
+
+def _group_search_results(tracks, query: str):
+    artists = defaultdict(list)
+    albums = defaultdict(list)
+    unknown_artist = tr("unknown_artist")
+    unknown_album = tr("unknown_album")
+
+    for track in tracks:
+        artist = (track.artist or unknown_artist).strip() or unknown_artist
+        album = (track.album or unknown_album).strip() or unknown_album
+        artists[artist].append(track)
+        albums[(album, artist)].append(track)
+
+    artist_rows = [
+        (artist, sorted(items, key=_artist_track_sort_key))
+        for artist, items in artists.items()
+        if query in artist.lower()
+    ]
+    album_rows = [
+        (album, artist, sorted(items, key=_album_track_sort_key))
+        for (album, artist), items in albums.items()
+        if query in album.lower() or query in artist.lower()
+    ]
+    song_rows = [
+        track
+        for track in tracks
+        if query
+        in f"{track.title or ''} {track.artist or ''} {track.album or ''}".lower()
+    ]
+
+    artist_rows.sort(key=lambda row: row[0].lower())
+    album_rows.sort(key=lambda row: (row[0].lower(), row[1].lower()))
+    song_rows.sort(key=_song_search_sort_key)
+    return artist_rows, album_rows, song_rows
+
+
+def _track_number_or_last(track) -> int:
+    return track.track_number if track.track_number > 0 else 9999
+
+
+def _artist_track_sort_key(track) -> tuple:
+    return track.album or "", _track_number_or_last(track), track.title or ""
+
+
+def _album_track_sort_key(track) -> tuple:
+    return _track_number_or_last(track), track.title or ""
+
+
+def _song_search_sort_key(track) -> tuple:
+    return (
+        (track.artist or "").lower(),
+        (track.album or "").lower(),
+        _track_number_or_last(track),
+        (track.title or "").lower(),
+    )

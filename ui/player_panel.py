@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
 
 from core.metadata import TrackMetadata
 from core.playlist import RepeatMode
+
 from .widgets import (
     AlbumCover,
     CircleButton,
@@ -103,14 +104,19 @@ class PlayerPanel(QWidget):
         self.lbl_pos = QLabel("00:00", self)
         self.lbl_index = QLabel("0/0", self)
         self.lbl_dur = QLabel("00:00", self)
-        f = QFont(); f.setPointSize(PLAYER_TIME_POINT_SIZE)
+        f = QFont()
+        f.setPointSize(PLAYER_TIME_POINT_SIZE)
         for lbl in (self.lbl_pos, self.lbl_index, self.lbl_dur):
             lbl.setFont(f)
             lbl.setFixedHeight(PLAYER_TIME_PAINT_HEIGHT)
             lbl.setStyleSheet("color: #FFFFFF; padding-bottom: 5px;")
-        self.lbl_pos.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.lbl_pos.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
         self.lbl_index.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_dur.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.lbl_dur.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
         labels_row.addWidget(self.lbl_pos, 1)
         labels_row.addWidget(self.lbl_index, 1)
         labels_row.addWidget(self.lbl_dur, 1)
@@ -246,7 +252,9 @@ class PlayerPanel(QWidget):
         font.setBold(bold)
         label.setFont(font)
         weight = "700" if bold else "400"
-        label.setStyleSheet(f"color: {color}; font-size: {pixel_size}px; font-weight: {weight};")
+        label.setStyleSheet(
+            f"color: {color}; font-size: {pixel_size}px; font-weight: {weight};"
+        )
 
     def set_track(self, track: Optional[TrackMetadata], index: int, total: int) -> None:
         if track is None:
@@ -313,7 +321,9 @@ class PlayerPanel(QWidget):
         self.btn_shuffle.set_enabled_visual(self._shuffled)
         self.btn_repeat.set_active(repeat_on)
         self.btn_repeat.set_enabled_visual(repeat_on)
-        self.btn_repeat.set_icon("repeat_one" if self._repeat == RepeatMode.ONE else "repeat")
+        self.btn_repeat.set_icon(
+            "repeat_one" if self._repeat == RepeatMode.ONE else "repeat"
+        )
 
     def _reset_info_scrolling(self) -> None:
         self._info_scroll_pos = 0
@@ -381,5 +391,5 @@ class PlayerPanel(QWidget):
                 self._info_scroll_direction = 1
                 self._info_scroll_pause_ticks = 12
 
-        for lbl, limit in zip(labels, limits):
+        for lbl, limit in zip(labels, limits, strict=False):
             lbl.set_scroll_offset(min(self._info_scroll_pos, limit))

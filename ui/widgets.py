@@ -20,8 +20,10 @@ from PyQt6.QtGui import (
     QPen,
     QPixmap,
 )
+
 try:
     from PyQt6.QtSvg import QSvgRenderer
+
     _HAS_QTSVG = True
 except ImportError:  # pragma: no cover
     QSvgRenderer = None  # type: ignore[assignment]
@@ -29,10 +31,6 @@ except ImportError:  # pragma: no cover
 from PyQt6.QtWidgets import QLabel, QPushButton, QSizePolicy, QWidget
 
 from .theme import Theme
-
-
-#
-#
 
 LUCIDE_STROKE: dict[str, str] = {
     "library": (
@@ -60,10 +58,7 @@ LUCIDE_STROKE: dict[str, str] = {
         "M11 9 L13 9 L13 15 "
         "M11.5 15 L14.5 15"
     ),
-    "back": (
-        "M9 14 4 9l5-5 "
-        "M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5 5.5 5.5 0 0 1-5.5 5.5H11"
-    ),
+    "back": ("M9 14 4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5 5.5 5.5 0 0 1-5.5 5.5H11"),
     "folder": (
         "M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"
     ),
@@ -76,14 +71,8 @@ LUCIDE_STROKE: dict[str, str] = {
 LUCIDE_FILL: dict[str, str] = {
     "play": "M8 5v14l11-7z",
     "pause": "M6 5h4v14H6zM14 5h4v14h-4z",
-    "prev": (
-        "M5 5 L5 19 L7 19 L7 5 Z "
-        "M19 5 L19 19 L8 12 Z"
-    ),
-    "next": (
-        "M5 5 L5 19 L16 12 Z "
-        "M17 5 L17 19 L19 19 L19 5 Z"
-    ),
+    "prev": ("M5 5 L5 19 L7 19 L7 5 Z M19 5 L19 19 L8 12 Z"),
+    "next": ("M5 5 L5 19 L16 12 Z M17 5 L17 19 L19 19 L19 5 Z"),
 }
 
 
@@ -93,7 +82,6 @@ def _draw_lucide_stroke(
     path_data: str,
     color: QColor,
     stroke_ratio: float = 2.0 / 24.0,
-    text_overlay: Optional[str] = None,
 ) -> None:
     """Draw a Lucide stroke icon."""
     if not _HAS_QTSVG:
@@ -109,7 +97,7 @@ def _draw_lucide_stroke(
         f'stroke-width="{stroke_ratio * 24:.2f}" '
         'stroke-linecap="round" stroke-linejoin="round">'
         f'<path d="{path_data}"/>'
-        '</svg>'
+        "</svg>"
     )
     renderer = QSvgRenderer(svg.encode("utf-8"))
     target = QRectF(
@@ -139,7 +127,7 @@ def _draw_lucide_fill(
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
         f'fill="{color.name()}" stroke="none">'
         f'<path d="{path_data}"/>'
-        '</svg>'
+        "</svg>"
     )
     renderer = QSvgRenderer(svg.encode("utf-8"))
     target = QRectF(
@@ -297,7 +285,8 @@ class AlbumCover(QWidget):
         target = QRectF(x, y, side, side)
         if self._pixmap and not self._pixmap.isNull():
             scaled = self._pixmap.scaled(
-                int(side), int(side),
+                int(side),
+                int(side),
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
@@ -314,8 +303,8 @@ class ProgressBar(QWidget):
 
     seek_requested = pyqtSignal(int)  # Target position in milliseconds.
 
-    _DOT_R = 5           # Thumb radius.
-    _PAD = 7             # Padding prevents clipped antialiasing.
+    _DOT_R = 5  # Thumb radius.
+    _PAD = 7  # Padding prevents clipped antialiasing.
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
