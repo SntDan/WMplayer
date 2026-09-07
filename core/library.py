@@ -104,17 +104,24 @@ def _cache_entry_is_current(cached: Optional[dict], mtime: float) -> bool:
     )
 
 
+_TEXT_FIELDS = ("title", "artist", "album")
+_INTEGER_FIELDS = ("duration_ms", "sample_rate", "bits_per_sample", "track_number")
+
+
 def _metadata_from_cache(path: str, cached: dict) -> TrackMetadata:
     return TrackMetadata(
         path=path,
-        title=cached.get("title", ""),
-        artist=cached.get("artist", ""),
-        album=cached.get("album", ""),
-        duration_ms=int(cached.get("duration_ms", 0)),
-        sample_rate=int(cached.get("sample_rate", 0)),
-        bits_per_sample=int(cached.get("bits_per_sample", 0)),
-        track_number=int(cached.get("track_number", 0)),
+        **{name: cached.get(name, "") for name in _TEXT_FIELDS},
+        **{name: int(cached.get(name, 0)) for name in _INTEGER_FIELDS},
     )
+
+
+def _metadata_to_cache(track: TrackMetadata, mtime: float) -> dict:
+    """Keep disk and scan cache fields identical, excluding in-memory covers."""
+    return {
+        **{name: getattr(track, name) for name in (*_TEXT_FIELDS, *_INTEGER_FIELDS)},
+        "mtime": mtime,
+    }
 
 
 def _create_thumbnail(path: str) -> None:
@@ -165,32 +172,18 @@ class Library(QObject):
     def _rebuild_display(self) -> None:
         """Build the deduplicated library view."""
         best: Dict[tuple, TrackMetadata] = {}
-        order: List[tuple] = []
         for t in self._tracks:
             key = (
                 (t.title or "").strip().lower(),
                 (t.artist or "").strip().lower(),
                 (t.album or "").strip().lower(),
             )
-            if key not in best:
-                order.append(key)
+            if key not in best or _spec_score(t) > _spec_score(best[key]):
                 best[key] = t
-            elif _spec_score(t) > _spec_score(best[key]):
-                best[key] = t
-        self._display_tracks = [best[k] for k in order]
+        self._display_tracks = list(best.values())
 
     def set_folders(self, folders: List[str]) -> None:
-        cleaned: List[str] = []
-        seen = set()
-        for f in folders:
-            if not f:
-                continue
-            f = os.path.abspath(f)
-            if f in seen:
-                continue
-            seen.add(f)
-            cleaned.append(f)
-        self._folders = cleaned
+        self._folders = list(dict.fromkeys(os.path.abspath(f) for f in folders if f))
         self.folders_changed.emit()
 
     def scan_async(self) -> None:
@@ -218,16 +211,7 @@ class Library(QObject):
                 mtime = os.path.getmtime(t.path)
             except OSError:
                 continue
-            cache[t.path] = {
-                "title": t.title,
-                "artist": t.artist,
-                "album": t.album,
-                "duration_ms": t.duration_ms,
-                "sample_rate": t.sample_rate,
-                "bits_per_sample": t.bits_per_sample,
-                "track_number": t.track_number,
-                "mtime": mtime,
-            }
+            cache[t.path] = _metadata_to_cache(t, mtime)
         return cache
 
     def _load_cache(self) -> None:
@@ -243,18 +227,7 @@ class Library(QObject):
             path = entry.get("path", "")
             if not path or not os.path.isfile(path):
                 continue
-            self._tracks.append(
-                TrackMetadata(
-                    path=path,
-                    title=entry.get("title", ""),
-                    artist=entry.get("artist", ""),
-                    album=entry.get("album", ""),
-                    duration_ms=int(entry.get("duration_ms", 0)),
-                    sample_rate=int(entry.get("sample_rate", 0)),
-                    bits_per_sample=int(entry.get("bits_per_sample", 0)),
-                    track_number=int(entry.get("track_number", 0)),
-                )
-            )
+            self._tracks.append(_metadata_from_cache(path, entry))
 
     def _save_cache(self) -> None:
         try:
@@ -264,14 +237,7 @@ class Library(QObject):
                 "tracks": [
                     {
                         "path": t.path,
-                        "title": t.title,
-                        "artist": t.artist,
-                        "album": t.album,
-                        "duration_ms": t.duration_ms,
-                        "sample_rate": t.sample_rate,
-                        "bits_per_sample": t.bits_per_sample,
-                        "track_number": t.track_number,
-                        "mtime": _safe_mtime(t.path),
+                        **_metadata_to_cache(t, _safe_mtime(t.path)),
                     }
                     for t in self._tracks
                 ],

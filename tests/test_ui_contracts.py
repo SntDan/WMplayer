@@ -12,13 +12,18 @@ _TEST_APPDATA = tempfile.TemporaryDirectory()
 os.environ["APPDATA"] = _TEST_APPDATA.name
 
 from PyQt6.QtTest import QSignalSpy
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication, QWidget
 
 from core.library import Library
 from core.metadata import TrackMetadata
+from core.playlist import Playlist
 from ui.albums_panel import AlbumsPanel
 from ui.library_panel import LibraryPanel
 from ui.main_window import MainWindow
+from ui.queue_panel import QueuePanel
+from ui.list_delegates import ROLE_IS_PLAYING
+from ui.list_helpers import suspended_updates
 
 
 class _FakeMpvProcess:
@@ -89,6 +94,44 @@ class UiContractTests(unittest.TestCase):
         self.assertEqual(len(spy), 1)
         self.assertEqual(spy[0][0], ["C:/album/one.flac", "C:/album/two.flac"])
         self.assertEqual(spy[0][1], 1)
+
+    def test_queue_filter_and_highlight_follow_indices_after_removal(self):
+        playlist = Playlist()
+        playlist.replace_with_tracks(self.library.tracks, 1)
+        panel = QueuePanel(playlist)
+        panel.search.setText("one")
+        panel._apply_filter("one")
+        self.assertTrue(panel.list.item(0).isHidden())
+        self.assertTrue(panel.list.item(1).data(ROLE_IS_PLAYING))
+        playlist.set_current(0)
+        self.assertFalse(panel.list.item(1).data(ROLE_IS_PLAYING))
+        self.assertTrue(panel.list.item(0).data(ROLE_IS_PLAYING))
+        playlist.set_current(1)
+        playlist.remove(0)
+        item = panel.list.item(0)
+        self.assertEqual(item.data(Qt.ItemDataRole.UserRole), 0)
+        self.assertFalse(item.isHidden())
+        self.assertTrue(item.data(ROLE_IS_PLAYING))
+        spy = QSignalSpy(panel.track_double_clicked)
+        panel._on_double_click(item)
+        self.assertEqual(spy[0][0], 0)
+        playlist.set_current(-1)
+        self.assertTrue(item.data(ROLE_IS_PLAYING))  # Invalid indices are ignored.
+        playlist.clear()
+        self.assertEqual(panel.list.count(), 0)
+        self.assertIsNone(panel._current_item)
+
+    def test_suspended_updates_restores_nested_and_disabled_state_on_error(self):
+        widget = QWidget()
+        with suspended_updates(widget):
+            with self.assertRaises(RuntimeError), suspended_updates(widget):
+                raise RuntimeError("rebuild failed")
+            self.assertFalse(widget.updatesEnabled())
+        self.assertTrue(widget.updatesEnabled())
+        widget.setUpdatesEnabled(False)
+        with suspended_updates(widget):
+            pass
+        self.assertFalse(widget.updatesEnabled())
 
     def test_main_window_builds_the_same_six_views_offscreen(self) -> None:
         with (

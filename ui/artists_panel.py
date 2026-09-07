@@ -1,12 +1,8 @@
 from typing import Dict, List, Optional
 
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QHBoxLayout,
-    QLabel,
     QLineEdit,
-    QListWidget,
     QListWidgetItem,
     QStackedWidget,
     QVBoxLayout,
@@ -17,8 +13,14 @@ from core.library import Library
 from core.metadata import TrackMetadata
 from core.thumbnails import thumb_path_for
 from ui.i18n import tr
-from ui.list_delegates import ROLE_SUBTITLE, ROLE_THUMB_PATH, CoverRowDelegate
-from ui.list_helpers import connect_debounced_filter, filter_items_by_text
+from ui.list_delegates import ROLE_SUBTITLE, ROLE_THUMB_PATH
+from ui.list_helpers import (
+    add_list_header,
+    connect_debounced_filter,
+    cover_list,
+    filter_items_by_text,
+    suspended_updates,
+)
 
 
 class ArtistsPanel(QWidget):
@@ -46,34 +48,14 @@ class ArtistsPanel(QWidget):
         l0.setContentsMargins(20, 16, 20, 16)
         l0.setSpacing(10)
 
-        h0 = QHBoxLayout()
-        self.title_label = QLabel(tr("artists"))
-        f = QFont()
-        f.setPointSize(15)
-        f.setBold(True)
-        self.title_label.setFont(f)
-        h0.addWidget(self.title_label)
-        h0.addStretch()
-        self.artist_count = QLabel("0")
-        self.artist_count.setStyleSheet("color: #9E9E9E;")
-        h0.addWidget(self.artist_count)
-        l0.addLayout(h0)
+        self.title_label, self.artist_count = add_list_header(l0, tr("artists"), "0")
 
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText(tr("search_artists"))
         self.search_box.setClearButtonEnabled(True)
         l0.addWidget(self.search_box)
 
-        self.list_artists = QListWidget()
-        self.list_artists.setTextElideMode(Qt.TextElideMode.ElideRight)
-        self.list_artists.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
-        self.list_artists.setUniformItemSizes(True)
-        self.list_artists.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
-        self.list_artists.setMouseTracking(True)
-        self._row_delegate = CoverRowDelegate(self.list_artists)
-        self.list_artists.setItemDelegate(self._row_delegate)
+        self.list_artists = cover_list()
         l0.addWidget(self.list_artists)
         self.stack.addWidget(self.page_list)
 
@@ -104,29 +86,24 @@ class ArtistsPanel(QWidget):
         self._artists_tracks.clear()
         for t in self._library.tracks:
             artist = t.artist.strip() if t.artist else tr("unknown_artist")
-            if artist not in self._artists_tracks:
-                self._artists_tracks[artist] = []
-            self._artists_tracks[artist].append(t)
+            self._artists_tracks.setdefault(artist, []).append(t)
 
         for artist in self._artists_tracks:
             self._artists_tracks[artist].sort(
                 key=lambda t: (t.album or "", t.title or "")
             )
 
-        self.list_artists.setUpdatesEnabled(False)
-        self.list_artists.clear()
-        artists = sorted(self._artists_tracks.keys())
-        for a in artists:
-            tracks = self._artists_tracks[a]
-            it = QListWidgetItem(a)
-            it.setData(Qt.ItemDataRole.UserRole, a)
-            if tracks:
+        artists = sorted(self._artists_tracks)
+        with suspended_updates(self.list_artists):
+            self.list_artists.clear()
+            for a in artists:
+                tracks = self._artists_tracks[a]
+                it = QListWidgetItem(a)
+                it.setData(Qt.ItemDataRole.UserRole, a)
                 it.setData(ROLE_THUMB_PATH, thumb_path_for(tracks[0].path))
                 album_count = len({t.album for t in tracks})
                 it.setData(ROLE_SUBTITLE, tr("albums_count", n=album_count))
-            self.list_artists.addItem(it)
-
-        self.list_artists.setUpdatesEnabled(True)
+                self.list_artists.addItem(it)
         self.artist_count.setText(tr("artists_count", n=len(artists)))
         self._apply_filter(self.search_box.text())
 

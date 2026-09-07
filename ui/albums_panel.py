@@ -7,7 +7,6 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QListWidget,
     QListWidgetItem,
     QPushButton,
     QSizePolicy,
@@ -24,12 +23,14 @@ from ui.list_delegates import (
     ROLE_IS_HR,
     ROLE_SUBTITLE,
     ROLE_THUMB_PATH,
-    CoverRowDelegate,
 )
 from ui.list_helpers import (
+    add_list_header,
     connect_debounced_filter,
+    cover_list,
     filter_items_by_text,
     suspended_updates,
+    track_item,
 )
 from ui.theme import PRIMARY_BTN_QSS
 
@@ -99,40 +100,11 @@ class AlbumsPanel(QWidget):
         l0.setSpacing(10)
 
         if self._embedded:
-            h_info_artist = QHBoxLayout()
-            h_info_artist.setSpacing(17)
-            self.lbl_artist_cover = QLabel()
-            self.lbl_artist_cover.setFixedSize(80, 80)
-            self.lbl_artist_cover.setStyleSheet(
-                "background-color: #222; border-radius: 4px;"
-            )
-            self.lbl_artist_cover.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            h_info_artist.addWidget(self.lbl_artist_cover)
-
-            v_texts_artist = QVBoxLayout()
-            v_texts_artist.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-            v_texts_artist.setContentsMargins(0, 0, 0, 8)
-            v_texts_artist.setSpacing(5)
-
-            self.lbl_embedded_title = ElidedLabel("")
-            femb = QFont()
-            femb.setPointSize(17)
-            femb.setBold(True)
-            self.lbl_embedded_title.setFont(femb)
-            self.lbl_embedded_title.setStyleSheet("font-size: 17pt; font-weight: bold;")
-            v_texts_artist.addWidget(self.lbl_embedded_title)
-
-            self.lbl_embedded_subtitle = ElidedLabel("")
-            femb_sub = QFont()
-            femb_sub.setPointSize(13)
-            self.lbl_embedded_subtitle.setFont(femb_sub)
-            self.lbl_embedded_subtitle.setStyleSheet("color: #AAA; font-size: 13pt;")
-            v_texts_artist.addWidget(self.lbl_embedded_subtitle)
-
-            h_info_artist.addLayout(v_texts_artist)
-            h_info_artist.addStretch()
-
-            l0.addLayout(h_info_artist)
+            (
+                self.lbl_artist_cover,
+                self.lbl_embedded_title,
+                self.lbl_embedded_subtitle,
+            ) = _add_detail_header(l0, spacing=17)
 
             h0 = QHBoxLayout()
             h0.addStretch()
@@ -141,18 +113,7 @@ class AlbumsPanel(QWidget):
             h0.addWidget(self.album_count)
             l0.addLayout(h0)
         else:
-            h0 = QHBoxLayout()
-            self.title_label = QLabel(tr("albums"))
-            f = QFont()
-            f.setPointSize(15)
-            f.setBold(True)
-            self.title_label.setFont(f)
-            h0.addWidget(self.title_label)
-            h0.addStretch()
-            self.album_count = QLabel("0")
-            self.album_count.setStyleSheet("color: #9E9E9E;")
-            h0.addWidget(self.album_count)
-            l0.addLayout(h0)
+            self.title_label, self.album_count = add_list_header(l0, tr("albums"), "0")
 
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText(tr("search_albums"))
@@ -163,16 +124,7 @@ class AlbumsPanel(QWidget):
 
         l0.addWidget(self.search_box)
 
-        self.list_albums = QListWidget()
-        self.list_albums.setTextElideMode(Qt.TextElideMode.ElideRight)
-        self.list_albums.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
-        self.list_albums.setUniformItemSizes(True)
-        self.list_albums.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
-        self.list_albums.setMouseTracking(True)
-        self._album_delegate = CoverRowDelegate(self.list_albums)
-        self.list_albums.setItemDelegate(self._album_delegate)
+        self.list_albums = cover_list()
         l0.addWidget(self.list_albums)
 
         if self._embedded:
@@ -195,50 +147,13 @@ class AlbumsPanel(QWidget):
         l1.setContentsMargins(20, 16, 20, 16)
         l1.setSpacing(10)
 
-        h_info = QHBoxLayout()
-        h_info.setSpacing(16)
-        self.lbl_album_cover = QLabel()
-        self.lbl_album_cover.setFixedSize(80, 80)
-        self.lbl_album_cover.setStyleSheet(
-            "background-color: #222; border-radius: 4px;"
-        )
-        self.lbl_album_cover.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        h_info.addWidget(self.lbl_album_cover)
+        (
+            self.lbl_album_cover,
+            self.lbl_album_title,
+            self.lbl_album_artist,
+        ) = _add_detail_header(l1, spacing=16)
 
-        v_texts = QVBoxLayout()
-        v_texts.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-        v_texts.setContentsMargins(0, 0, 0, 8)
-        v_texts.setSpacing(5)
-        self.lbl_album_title = ElidedLabel("")
-        f2 = QFont()
-        f2.setPointSize(17)
-        f2.setBold(True)
-        self.lbl_album_title.setFont(f2)
-        self.lbl_album_title.setStyleSheet("font-size: 17pt; font-weight: bold;")
-        v_texts.addWidget(self.lbl_album_title)
-
-        self.lbl_album_artist = ElidedLabel("")
-        f3 = QFont()
-        f3.setPointSize(13)
-        self.lbl_album_artist.setFont(f3)
-        self.lbl_album_artist.setStyleSheet("color: #AAA; font-size: 13pt;")
-        v_texts.addWidget(self.lbl_album_artist)
-
-        h_info.addLayout(v_texts)
-        h_info.addStretch()
-
-        l1.addLayout(h_info)
-
-        self.list_tracks = QListWidget()
-        self.list_tracks.setTextElideMode(Qt.TextElideMode.ElideRight)
-        self.list_tracks.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
-        self.list_tracks.setUniformItemSizes(True)
-        self.list_tracks.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
-        self.list_tracks.setMouseTracking(True)
-        self._track_delegate = CoverRowDelegate(self.list_tracks)
-        self.list_tracks.setItemDelegate(self._track_delegate)
+        self.list_tracks = cover_list()
         l1.addWidget(self.list_tracks)
 
         h_back = QHBoxLayout()
@@ -319,12 +234,7 @@ class AlbumsPanel(QWidget):
         with suspended_updates(self.list_tracks):
             self.list_tracks.clear()
             for track in tracks:
-                item = QListWidgetItem(track.title)
-                item.setData(Qt.ItemDataRole.UserRole, track.path)
-                item.setData(ROLE_THUMB_PATH, thumb_path_for(track.path))
-                item.setData(ROLE_SUBTITLE, track.artist or "")
-                item.setData(ROLE_IS_HR, track.is_high_res())
-                self.list_tracks.addItem(item)
+                self.list_tracks.addItem(track_item(track, track.path))
 
         self.stack.setCurrentIndex(1)
 
@@ -437,3 +347,35 @@ def _set_cover_label(label: QLabel, pixmap: Optional[QPixmap], fallback: str) ->
         return
     label.clear()
     label.setText(fallback)
+
+
+def _add_detail_header(layout: QVBoxLayout, *, spacing: int) -> tuple:
+    """Build the matching artist/album headers with their original spacing."""
+    row = QHBoxLayout()
+    row.setSpacing(spacing)
+    cover = QLabel()
+    cover.setFixedSize(80, 80)
+    cover.setStyleSheet("background-color: #222; border-radius: 4px;")
+    cover.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    row.addWidget(cover)
+
+    texts = QVBoxLayout()
+    texts.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+    texts.setContentsMargins(0, 0, 0, 8)
+    texts.setSpacing(5)
+    title, subtitle = ElidedLabel(""), ElidedLabel("")
+    for label, size, bold, style in (
+        (title, 17, True, "font-size: 17pt; font-weight: bold;"),
+        (subtitle, 13, False, "color: #AAA; font-size: 13pt;"),
+    ):
+        font = QFont()
+        font.setPointSize(size)
+        if bold:
+            font.setBold(True)
+        label.setFont(font)
+        label.setStyleSheet(style)
+        texts.addWidget(label)
+    row.addLayout(texts)
+    row.addStretch()
+    layout.addLayout(row)
+    return cover, title, subtitle

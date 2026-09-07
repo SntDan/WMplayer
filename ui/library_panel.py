@@ -6,10 +6,8 @@ from collections import defaultdict
 from typing import List, Optional
 
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QHBoxLayout,
-    QLabel,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
@@ -28,9 +26,13 @@ from ui.list_delegates import (
     ROLE_SECTION_HEADER,
     ROLE_SUBTITLE,
     ROLE_THUMB_PATH,
-    CoverRowDelegate,
 )
-from ui.list_helpers import connect_debounced_filter, suspended_updates
+from ui.list_helpers import (
+    add_list_header,
+    connect_debounced_filter,
+    cover_list,
+    suspended_updates,
+)
 from ui.theme import BTN_QSS as _BTN_QSS
 
 
@@ -54,18 +56,9 @@ class LibraryPanel(QWidget):
         outer.setContentsMargins(20, 16, 20, 16)
         outer.setSpacing(10)
 
-        header = QHBoxLayout()
-        self.title_label = QLabel(tr("library"))
-        f = QFont()
-        f.setPointSize(15)
-        f.setBold(True)
-        self.title_label.setFont(f)
-        self.count_label = QLabel(tr("tracks_count", n=0))
-        self.count_label.setStyleSheet("color: #9E9E9E;")
-        header.addWidget(self.title_label)
-        header.addStretch(1)
-        header.addWidget(self.count_label)
-        outer.addLayout(header)
+        self.title_label, self.count_label = add_list_header(
+            outer, tr("library"), tr("tracks_count", n=0)
+        )
 
         action_row = QHBoxLayout()
         action_row.setSpacing(6)
@@ -90,16 +83,9 @@ class LibraryPanel(QWidget):
         )
         outer.addWidget(self.progress)
 
-        self.list = QListWidget()
-        self.list.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
-        self.list.setUniformItemSizes(False)
+        self.list = cover_list(uniform_sizes=False)
         self.list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.list.setMouseTracking(True)
-        self.list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.list.setTextElideMode(Qt.TextElideMode.ElideRight)
-        self._row_delegate = CoverRowDelegate(self.list)
-        self.list.setItemDelegate(self._row_delegate)
         outer.addWidget(self.list, 1)
 
     def _wire(self) -> None:

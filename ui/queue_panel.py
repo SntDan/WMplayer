@@ -5,11 +5,10 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont, QKeySequence, QShortcut
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QInputDialog,
-    QLabel,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
@@ -20,16 +19,15 @@ from PyQt6.QtWidgets import (
 )
 
 from core.playlist import Playlist
-from core.thumbnails import thumb_path_for
 from ui.i18n import tr
-from ui.list_delegates import (
-    ROLE_IS_HR,
-    ROLE_IS_PLAYING,
-    ROLE_SUBTITLE,
-    ROLE_THUMB_PATH,
-    CoverRowDelegate,
+from ui.list_delegates import ROLE_IS_PLAYING
+from ui.list_helpers import (
+    add_list_header,
+    connect_debounced_filter,
+    cover_list,
+    suspended_updates,
+    track_item,
 )
-from ui.list_helpers import connect_debounced_filter
 from ui.theme import BTN_QSS as _BTN_QSS
 
 
@@ -44,7 +42,6 @@ class QueuePanel(QWidget):
     def __init__(self, playlist: Playlist, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._playlist = playlist
-        self._index_items = {}
         self._current_item = None
         self._build_ui()
         self._wire()
@@ -55,18 +52,9 @@ class QueuePanel(QWidget):
         outer.setContentsMargins(20, 16, 20, 16)
         outer.setSpacing(10)
 
-        header = QHBoxLayout()
-        self.title_label = QLabel(tr("queue"))
-        f = QFont()
-        f.setPointSize(15)
-        f.setBold(True)
-        self.title_label.setFont(f)
-        self.count_label = QLabel(tr("tracks_count", n=0))
-        self.count_label.setStyleSheet("color: #9E9E9E;")
-        header.addWidget(self.title_label)
-        header.addStretch(1)
-        header.addWidget(self.count_label)
-        outer.addLayout(header)
+        self.title_label, self.count_label = add_list_header(
+            outer, tr("queue"), tr("tracks_count", n=0)
+        )
 
         action_row = QHBoxLayout()
         action_row.setSpacing(6)
@@ -83,15 +71,8 @@ class QueuePanel(QWidget):
             action_row.addWidget(b)
         outer.addLayout(action_row)
 
-        self.list = QListWidget()
-        self.list.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
-        self.list.setUniformItemSizes(True)
-        self.list.setMouseTracking(True)
+        self.list = cover_list()
         self.list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.list.setTextElideMode(Qt.TextElideMode.ElideRight)
-        self._row_delegate = CoverRowDelegate(self.list)
-        self.list.setItemDelegate(self._row_delegate)
         outer.addWidget(self.list, 1)
 
     def _wire(self) -> None:
@@ -109,21 +90,11 @@ class QueuePanel(QWidget):
         sc.activated.connect(self._delete_selected)
 
     def refresh(self) -> None:
-        self.list.setUpdatesEnabled(False)
-        try:
+        with suspended_updates(self.list):
             self.list.clear()
-            self._index_items = {}
             self._current_item = None
             for i, t in enumerate(self._playlist.tracks):
-                it = QListWidgetItem(t.title or "")
-                it.setData(Qt.ItemDataRole.UserRole, i)
-                it.setData(ROLE_THUMB_PATH, thumb_path_for(t.path))
-                it.setData(ROLE_SUBTITLE, t.artist or "")
-                it.setData(ROLE_IS_HR, t.is_high_res())
-                self.list.addItem(it)
-                self._index_items[i] = it
-        finally:
-            self.list.setUpdatesEnabled(True)
+                self.list.addItem(track_item(t, i))
         self.count_label.setText(tr("tracks_count", n=len(self._playlist)))
         self._highlight_current()
         self._apply_filter(self.search.text())
@@ -133,7 +104,7 @@ class QueuePanel(QWidget):
         current = self._playlist.current_index
         if self._current_item is not None:
             self._current_item.setData(ROLE_IS_PLAYING, False)
-        item = self._index_items.get(current)
+        item = self.list.item(current)
         if item is not None:
             item.setData(ROLE_IS_PLAYING, True)
         self._current_item = item
@@ -146,7 +117,7 @@ class QueuePanel(QWidget):
         current = self._playlist.current_index
         if current < 0:
             return
-        item = self._index_items.get(current)
+        item = self.list.item(current)
         if item is not None:
             self.list.scrollToItem(item, QListWidget.ScrollHint.PositionAtCenter)
 

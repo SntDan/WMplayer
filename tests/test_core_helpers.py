@@ -1,16 +1,74 @@
 from __future__ import annotations
 
 import os
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
 from core import lrc, m3u
-from core.library import _discover_audio_files, _metadata_from_cache
+from core.library import Library, _discover_audio_files, _metadata_from_cache
+from core.metadata import TrackMetadata
 from core.playlist_store import PlaylistStore
 
 
 class CoreHelperTests(unittest.TestCase):
+    def test_library_cache_round_trip_preserves_schema_without_cover_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            song = Path(directory) / "song.flac"
+            song.touch()
+            cache = Path(directory) / "cache.json"
+            library = Library(str(cache))
+            track = TrackMetadata(
+                path=str(song),
+                title="Song",
+                artist="Artist",
+                album="Album",
+                duration_ms=1234,
+                sample_rate=96000,
+                bits_per_sample=24,
+                track_number=7,
+                cover=b"in-memory cover",
+            )
+            library.set_folders([directory, directory, ""])
+            library._tracks = [track]
+            library._save_cache()
+            record = json.loads(cache.read_text(encoding="utf-8"))["tracks"][0]
+            self.assertNotIn("cover", record)
+            self.assertEqual(
+                {key: value for key, value in record.items() if key != "path"},
+                library._build_cache_dict()[str(song)],
+            )
+            restored = Library(str(cache))
+            track.cover = None
+            self.assertEqual(restored.tracks, [track])
+            self.assertEqual(restored.folders, [directory])
+
+            # Legacy caches allow numeric strings and missing metadata fields.
+            cache.write_text(
+                json.dumps({"tracks": [{"path": str(song), "duration_ms": "4321"}]}),
+                encoding="utf-8",
+            )
+            restored = Library(str(cache)).tracks[0]
+            self.assertEqual(
+                (restored.title, restored.duration_ms, restored.track_number),
+                ("", 4321, 0),
+            )
+
+    def test_library_dedup_preserves_first_position_and_best_quality(self):
+        library = Library("")
+        low = TrackMetadata("low.flac", title=" Song ", artist="Artist", album="Album")
+        other = TrackMetadata("other.flac", title="Other")
+        high = TrackMetadata(
+            "high.flac", title="song", artist="artist", album="album", sample_rate=96000
+        )
+        tied = TrackMetadata(
+            "tied.flac", title="song", artist="artist", album="album", sample_rate=96000
+        )
+        library._tracks = [low, other, high, tied]
+        library._rebuild_display()
+        self.assertEqual(library.tracks, [high, other])
+
     def test_library_discovery_filters_extensions_and_overlapping_folders(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
