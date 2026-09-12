@@ -8,6 +8,7 @@ from PyQt6.QtCore import (
     QEasingCurve,
     QPropertyAnimation,
     QRect,
+    QRectF,
     Qt,
     pyqtProperty,
     pyqtSignal,
@@ -28,6 +29,8 @@ from .theme import Theme
 LYRIC_VISUAL_LEAD_MS = 240
 LYRIC_ANIMATE_MAX_LINE_JUMP = 2
 LYRIC_TEXT_CLIP_PAD = 3
+LYRIC_SCROLL_DURATION_MS = 360
+LYRIC_VERTICAL_MARGIN = 8
 
 
 class _LyricsCanvas(QWidget):
@@ -42,14 +45,15 @@ class _LyricsCanvas(QWidget):
         self._synced: bool = False
         self._scroll: float = 0.0
         self._anim = QPropertyAnimation(self, b"scroll")
-        self._anim.setDuration(180)
-        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._anim.setDuration(LYRIC_SCROLL_DURATION_MS)
+        self._anim.setEasingCurve(QEasingCurve.Type.InOutSine)
         self._font = QFont()
-        self._font.setPointSize(13)
+        self._font.setPointSize(16)
+        self._font.setBold(True)
         self._font_active = QFont()
         self._font_active.setPointSize(17)
         self._font_active.setBold(True)
-        self._row_gap = 14
+        self._row_gap = 6
         self._text_margin = 24
 
         self._heights: list[float] = []
@@ -96,22 +100,45 @@ class _LyricsCanvas(QWidget):
             return
         old_index = self._current_index
         self._current_index = index
-        if self._lyrics and 0 <= index < len(self._lyrics):
-            target = self._block_top(index) + self._block_height(index) / 2
-        else:
-            target = 0.0
+        target = self._target_scroll()
+        # A seek must also cancel any unfinished animation to the previous line.
+        self._anim.stop()
         if (
             animate
             and old_index >= 0
             and abs(index - old_index) <= LYRIC_ANIMATE_MAX_LINE_JUMP
+            and abs(target - self._scroll) > 0.5
         ):
-            self._anim.stop()
             self._anim.setStartValue(self._scroll)
             self._anim.setEndValue(target)
             self._anim.start()
         else:
             self._set_scroll(target)
         self.update()
+
+    def _max_scroll(self) -> float:
+        self._ensure_heights()
+        return max(0.0, self._total_height + 2 * LYRIC_VERTICAL_MARGIN - self.height())
+
+    def _target_scroll(self) -> float:
+        """Start at the top; follow the active row only after it reaches mid-view."""
+        if not self._lyrics or not 0 <= self._current_index < len(self._lyrics):
+            return 0.0
+        target = (
+            LYRIC_VERTICAL_MARGIN
+            + self._block_top(self._current_index)
+            + self._block_height(self._current_index) / 2
+            - self.height() / 2
+        )
+        return max(0.0, min(target, self._max_scroll()))
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._anim.stop()
+        if self._synced:
+            self._set_scroll(self._target_scroll())
+        else:
+            self._clamp_scroll()
 
     def _font_for(self, index: int) -> QFont:
         return (
@@ -124,7 +151,7 @@ class _LyricsCanvas(QWidget):
         """Refresh cached lyric layout when inputs change."""
         key = (
             id(self._lyrics) if self._lyrics else None,
-            self._current_index,
+            self._synced,
             self.width(),
         )
         if key == self._height_cache_key:
@@ -142,15 +169,19 @@ class _LyricsCanvas(QWidget):
         fm_active = QFontMetrics(self._font_active)
 
         acc = 0.0
-        for i, line in enumerate(self._lyrics.lines):
+        for line in self._lyrics.lines:
             self._offsets.append(acc)
             text = line.text
             if not text:
                 self._heights.append(0.0)
                 continue
-            fm = fm_active if (self._synced and i == self._current_index) else fm_normal
-            rect = fm.boundingRect(QRect(0, 0, int(max_w), 10000), flags, text)
-            h = float(rect.height() + self._row_gap)
+            bounds = QRect(0, 0, int(max_w), 10000)
+            text_h = fm_normal.boundingRect(bounds, flags, text).height()
+            if self._synced:
+                # Reserve both font sizes, including wrapped lines, so changing
+                # the highlight never shifts the surrounding lyrics.
+                text_h = max(text_h, fm_active.boundingRect(bounds, flags, text).height())
+            h = float(text_h + self._row_gap)
             self._heights.append(h)
             acc += h
         self._total_height = acc
@@ -173,7 +204,6 @@ class _LyricsCanvas(QWidget):
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
         w = self.width()
         h = self.height()
-        center_y = h / 2
 
         if self._lyrics is None or len(self._lyrics) == 0:
             p.setPen(Theme.TEXT_DIM)
@@ -185,15 +215,14 @@ class _LyricsCanvas(QWidget):
             p.end()
             return
 
-        if self._synced:
-            origin_y = center_y
-        else:
-            origin_y = 30.0
-
         max_w = max(50, w - 2 * self._text_margin)
-        flags = int(Qt.TextFlag.TextWordWrap) | int(Qt.AlignmentFlag.AlignHCenter)
+        flags = (
+            int(Qt.TextFlag.TextWordWrap)
+            | int(Qt.AlignmentFlag.AlignHCenter)
+            | int(Qt.AlignmentFlag.AlignVCenter)
+        )
 
-        y_top = origin_y - self._scroll
+        y_top = LYRIC_VERTICAL_MARGIN - self._scroll
         for i, line in enumerate(self._lyrics.lines):
             block_h = self._block_height(i)
             text = line.text
@@ -216,16 +245,19 @@ class _LyricsCanvas(QWidget):
                 if self._synced and self._current_index >= 0:
                     distance = abs(i - self._current_index)
                     alpha = max(60, 200 - distance * 35)
+                elif self._synced:
+                    # Before the first timed line, the spotlight is off.
+                    alpha = 60
                 else:
                     alpha = 200
                 p.setPen(QColor(255, 255, 255, alpha))
 
             text_h = block_h - self._row_gap
-            rect = QRect(
+            rect = QRectF(
                 self._text_margin,
-                int(y_top + self._row_gap / 2 - LYRIC_TEXT_CLIP_PAD),
-                int(max_w),
-                int(text_h + LYRIC_TEXT_CLIP_PAD * 2),
+                y_top + self._row_gap / 2 - LYRIC_TEXT_CLIP_PAD,
+                max_w,
+                text_h + LYRIC_TEXT_CLIP_PAD * 2,
             )
             p.drawText(rect, flags, text)
 
@@ -262,8 +294,7 @@ class _LyricsCanvas(QWidget):
                 return
             return
         if self._synced:
-            origin_y = self.height() / 2
-            clicked_y = e.position().y() - origin_y + self._scroll
+            clicked_y = e.position().y() - LYRIC_VERTICAL_MARGIN + self._scroll
             y_acc = 0.0
             for i in range(len(self._lyrics)):
                 bh = self._block_height(i)
@@ -285,8 +316,7 @@ class _LyricsCanvas(QWidget):
         if self._lyrics is None or len(self._lyrics) == 0:
             self._scroll = 0.0
             return
-        self._ensure_heights()
-        max_scroll = max(0.0, self._total_height - self.height() + 60)
+        max_scroll = self._max_scroll()
         if self._scroll < 0:
             self._scroll = 0.0
         elif self._scroll > max_scroll:
