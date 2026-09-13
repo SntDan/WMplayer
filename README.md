@@ -96,7 +96,9 @@ Song.flac
 Song.lrc
 ```
 
-Synced LRC files scroll automatically. Plain text lyric files can still be displayed, but they do not sync to playback.
+Synced LRC files scroll automatically with smooth transitions and a focused highlight on the current line. Click a line to seek to it, or use the mouse wheel or scrollbar to browse the lyrics. The scrollbar hides after 1 second without scrolling, and automatic following resumes after 5 seconds without interaction.
+
+Plain text lyric files can also be displayed and scrolled manually, but they do not sync to playback.
 
 ## Project Structure
 
@@ -238,7 +240,9 @@ Song.flac
 Song.lrc
 ```
 
-带时间戳的 LRC 歌词会自动同步滚动。纯文本歌词也可以显示，但不会跟随播放进度。
+带时间戳的 LRC 歌词会平滑同步滚动，并集中高亮当前句。点击歌词可跳转到对应播放位置，也可使用鼠标滚轮或拖动滚动条浏览歌词。停止滚动 1 秒后滚动条自动隐藏，无操作 5 秒后自动回到当前播放的歌词位置。
+
+纯文本歌词也可以显示和手动滚动，但不会跟随播放进度。
 
 ## 项目结构
 
