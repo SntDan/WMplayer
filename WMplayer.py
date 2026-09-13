@@ -25,24 +25,7 @@ def _set_windows_app_id() -> None:
         pass
 
 
-def _set_windows_dpi_awareness() -> None:
-    if sys.platform != "win32":
-        return
-    try:
-        import ctypes
-
-        ctypes.windll.shcore.SetProcessDpiAwareness(1)
-    except Exception:
-        try:
-            import ctypes
-
-            ctypes.windll.user32.SetProcessDPIAware()
-        except Exception:
-            pass
-
-
 def main() -> int:
-    _set_windows_dpi_awareness()
     _set_windows_app_id()
 
     from PyQt6.QtWidgets import QApplication
@@ -52,6 +35,7 @@ def main() -> int:
     QApplication.setApplicationName("WMplayer")
     QApplication.setOrganizationName("WMplayer")
 
+    # Let Qt 6 configure per-monitor DPI awareness before creating any windows.
     app = QApplication(sys.argv)
     win = MainWindow()
     win.show()

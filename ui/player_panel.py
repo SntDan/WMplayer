@@ -65,9 +65,7 @@ class PlayerPanel(QWidget):
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self._cached_below_h: Optional[int] = None
         self._build_ui()
-        self._is_playing = False
         self._shuffled: bool = False
         self._repeat: RepeatMode = RepeatMode.NONE
         self._info_scroll_pos = 0
@@ -291,7 +289,6 @@ class PlayerPanel(QWidget):
         self.lbl_dur.setText(_format_ms(ms))
 
     def set_playing(self, playing: bool) -> None:
-        self._is_playing = playing
         self.btn_play.set_icon("pause" if playing else "play")
 
     def set_shuffled(self, shuffled: bool) -> None:
@@ -345,11 +342,7 @@ class PlayerPanel(QWidget):
         h = self.height()
         if h <= 0:
             return
-        if self._cached_below_h is None:
-            self._cached_below_h = self._below.sizeHint().height()
-        below_h = self._cached_below_h
-
-        ideal_w = h - below_h
+        ideal_w = h - self._below.sizeHint().height()
 
         win = self.window()
         if win and win.width() > 0:

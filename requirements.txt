@@ -1,4 +1,6 @@
-PyQt6>=6.5.0
+# Keep the Qt runtime on the version verified for mixed-DPI screen moves.
+PyQt6==6.10.2
+PyQt6-Qt6==6.10.2
 pywin32>=306; platform_system == "Windows"
 mutagen>=1.47.0
 Pillow>=10.0.0

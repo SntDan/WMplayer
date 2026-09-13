@@ -156,7 +156,6 @@ class IconButton(QPushButton):
         self._disabled_color = QColor("#555555")
         self._active = active
         self._enabled_visual = True
-        self._size = size
         self._icon_y_offset = 0
         self.setFixedSize(QSize(size, size))
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -168,9 +167,6 @@ class IconButton(QPushButton):
     def set_active(self, active: bool) -> None:
         self._active = active
         self.update()
-
-    def is_active(self) -> bool:
-        return self._active
 
     def set_enabled_visual(self, enabled: bool) -> None:
         """Change visual availability without disabling clicks."""
@@ -217,7 +213,6 @@ class CircleButton(QPushButton):
     ) -> None:
         super().__init__(parent)
         self._icon_name = icon_name
-        self._size = size
         self.setFixedSize(QSize(size, size))
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
@@ -388,8 +383,6 @@ class ScrollingLabel(QLabel):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._offset = 0
-        self._direction = 1
-        self._pause_ticks = 0
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         sp = QSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.setSizePolicy(sp)
@@ -404,13 +397,7 @@ class ScrollingLabel(QLabel):
     def setText(self, text: str) -> None:  # noqa: N802
         super().setText(text)
         self._offset = 0
-        self._direction = 1
-        self._pause_ticks = 0
         self.update()
-
-    def needs_scroll(self) -> bool:
-        """Return whether the text overflows."""
-        return self.scroll_limit() > 0
 
     def scroll_limit(self) -> int:
         text_w = self.fontMetrics().horizontalAdvance(self.text())
@@ -424,32 +411,6 @@ class ScrollingLabel(QLabel):
 
     def reset_scroll(self) -> None:
         self._offset = 0
-        self._direction = 1
-        self._pause_ticks = 0
-        self.update()
-
-    def tick(self) -> None:
-        """Advance one marquee frame."""
-        if not self.needs_scroll() or not self.isVisible():
-            return
-        if self._pause_ticks > 0:
-            self._pause_ticks -= 1
-            return
-
-        self._offset += self._direction
-        max_off = self.scroll_limit()
-        if max_off <= 0:
-            self._offset = 0
-            self._direction = 1
-            self._pause_ticks = 8
-        elif self._offset >= max_off:
-            self._offset = max_off
-            self._direction = -1
-            self._pause_ticks = 8
-        elif self._offset <= 0:
-            self._offset = 0
-            self._direction = 1
-            self._pause_ticks = 8
         self.update()
 
     def mouseDoubleClickEvent(self, e):  # noqa: N802

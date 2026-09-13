@@ -331,7 +331,6 @@ class AudioEngine(QObject):
         except Exception as exc:
             message = f"MPV backend is unavailable: {exc}"
             QTimer.singleShot(0, lambda: self.error_occurred.emit(message))
-            self._init_error = exc
 
         self._poll_timer = QTimer(self)
         self._poll_timer.setInterval(100)

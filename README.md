@@ -46,7 +46,7 @@ It uses mpv for playback, reads metadata with mutagen, and supports common lossl
 | Dependency | Version |
 |---|---|
 | Python | >= 3.10 |
-| PyQt6 | >= 6.5 |
+| PyQt6 / Qt runtime | 6.10.2 |
 | pywin32 | >= 306 on Windows |
 | mutagen | >= 1.47 |
 | Pillow | >= 10.0 |
@@ -190,7 +190,7 @@ WMplayer 是一个用 Python 和 PyQt6 写的本地桌面音乐播放器。它�
 | 依赖 | 版本 |
 |---|---|
 | Python | >= 3.10 |
-| PyQt6 | >= 6.5 |
+| PyQt6 / Qt 运行库 | 6.10.2 |
 | pywin32 | Windows 上 >= 306 |
 | mutagen | >= 1.47 |
 | Pillow | >= 10.0 |

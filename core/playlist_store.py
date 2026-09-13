@@ -28,18 +28,6 @@ class PlaylistStore(QObject):
     def default_dir(self) -> str:
         return self._default_dir
 
-    def set_default_dir(self, directory: str) -> None:
-        self._default_dir = directory
-        try:
-            os.makedirs(self._default_dir, exist_ok=True)
-        except Exception:
-            pass
-        self.changed.emit()
-
-    @property
-    def locations(self) -> List[str]:
-        return list(self._locations)
-
     def set_locations(self, locations: List[str]) -> None:
         self._locations = [location for location in locations if location]
         self.changed.emit()

@@ -12,7 +12,6 @@ from PyQt6.QtCore import (
     QSize,
     Qt,
     QThreadPool,
-    QTimer,
     pyqtSignal,
 )
 from PyQt6.QtGui import QKeySequence, QShortcut
@@ -235,7 +234,6 @@ class MainWindow(QMainWindow):
         self._config = Config()
         set_language(str(self._config.get("language", "en")))
 
-        self._screen_sig_wired = False
         self._last_media_command: tuple[int, float] = (-1, 0.0)
         self._media_key_hook = _MediaKeyHook(self)
 
@@ -532,20 +530,6 @@ class MainWindow(QMainWindow):
         super().resizeEvent(e)
         if hasattr(self, "player_panel"):
             self.player_panel._lock_width_to_height()
-
-    def showEvent(self, e):  # noqa: N802
-        super().showEvent(e)
-        wh = self.windowHandle()
-        if wh is not None and not self._screen_sig_wired:
-            wh.screenChanged.connect(self._on_screen_changed)
-            self._screen_sig_wired = True
-
-    def _on_screen_changed(self, _screen) -> None:
-        """Refresh layout after a screen change."""
-        pp = getattr(self, "player_panel", None)
-        if pp is not None:
-            pp._cached_below_h = None
-            QTimer.singleShot(0, pp._lock_width_to_height)
 
     def closeEvent(self, e):  # noqa: N802
         if not self._config.factory_reset_pending:
