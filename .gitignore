@@ -1,9 +1,23 @@
-/core/__pycache__
-/ui/__pycache__
+# Python and tool caches
 __pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Tests
+/tests/
+/test/
+
+# Local development and generated builds
 .vscode/
-/build
+.venv/
+venv/
+/build/
 *.spec
-/dist
-/mpv
-*.pyc
+/dist/
+*.egg-info/
+/mpv/

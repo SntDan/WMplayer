@@ -6,10 +6,12 @@ from typing import Optional
 
 from PyQt6.QtCore import (
     QEasingCurve,
+    QEvent,
     QPropertyAnimation,
     QRect,
     QRectF,
     Qt,
+    QTimer,
     pyqtProperty,
     pyqtSignal,
 )
@@ -17,6 +19,7 @@ from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
+    QScrollBar,
     QVBoxLayout,
     QWidget,
 )
@@ -33,6 +36,8 @@ LYRIC_SCROLL_DURATION_MS = 300
 LYRIC_LIGHT_DURATION_MS = 180
 LYRIC_INTRO_FADE_MS = 180
 LYRIC_VERTICAL_MARGIN = 10
+LYRIC_SCROLLBAR_HIDE_MS = 1000
+LYRIC_FOLLOW_RESUME_MS = 5000
 
 
 class _LyricsCanvas(QWidget):
@@ -69,6 +74,33 @@ class _LyricsCanvas(QWidget):
         self._drag_start_y: Optional[float] = None
         self._drag_start_scroll: float = 0.0
 
+        self._manual_scroll = False
+        self._scrollbar = QScrollBar(Qt.Orientation.Vertical, self)
+        self._scrollbar.setStyleSheet("""
+            QScrollBar:vertical { background: transparent; width: 8px; margin: 0; }
+            QScrollBar::handle:vertical {
+                background: rgba(255, 255, 255, 100); min-height: 24px;
+                border-radius: 4px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: transparent;
+            }
+        """)
+        self._scrollbar.hide()
+        self._scrollbar.installEventFilter(self)
+        self._scrollbar.valueChanged.connect(self._scrollbar_moved)
+        self._scrollbar.sliderPressed.connect(self._begin_manual_scroll)
+        self._scrollbar.sliderReleased.connect(self._begin_manual_scroll)
+        self._scrollbar_hide_timer = QTimer(self)
+        self._scrollbar_hide_timer.setSingleShot(True)
+        self._scrollbar_hide_timer.setInterval(LYRIC_SCROLLBAR_HIDE_MS)
+        self._scrollbar_hide_timer.timeout.connect(self._scrollbar.hide)
+        self._follow_timer = QTimer(self)
+        self._follow_timer.setSingleShot(True)
+        self._follow_timer.setInterval(LYRIC_FOLLOW_RESUME_MS)
+        self._follow_timer.timeout.connect(self._resume_follow)
+
         self.setMinimumHeight(200)
 
     def _get_scroll(self) -> float:
@@ -76,9 +108,51 @@ class _LyricsCanvas(QWidget):
 
     def _set_scroll(self, value: float) -> None:
         self._scroll = float(value)
+        self._sync_scrollbar()
         self.update()
 
     scroll = pyqtProperty(float, fget=_get_scroll, fset=_set_scroll)
+
+    def _sync_scrollbar(self) -> None:
+        self._scrollbar.blockSignals(True)
+        self._scrollbar.setRange(0, round(self._max_scroll()))
+        self._scrollbar.setPageStep(self.height())
+        self._scrollbar.setValue(round(self._scroll))
+        self._scrollbar.blockSignals(False)
+        if self._scrollbar.maximum() == 0:
+            self._scrollbar.hide()
+
+    def _begin_manual_scroll(self) -> None:
+        self._anim.stop()
+        self._manual_scroll = True
+        self._sync_scrollbar()
+        self._scrollbar.setVisible(self._scrollbar.maximum() > 0)
+        if self._scrollbar.isSliderDown():
+            self._scrollbar_hide_timer.stop()
+            self._follow_timer.stop()
+        else:
+            self._scrollbar_hide_timer.start()
+            if self._synced:
+                self._follow_timer.start()
+
+    def _scrollbar_moved(self, value: int) -> None:
+        self._set_scroll(float(value))
+        self._begin_manual_scroll()
+
+    def _resume_follow(self) -> None:
+        self._manual_scroll = False
+        self._follow_timer.stop()
+        if self._synced:
+            self._anim.stop()
+            self._anim.setStartValue(self._scroll)
+            self._anim.setEndValue(self._target_scroll())
+            self._anim.start()
+
+    def eventFilter(self, watched, event):  # noqa: N802
+        if watched is self._scrollbar and event.type() == QEvent.Type.Wheel:
+            self.wheelEvent(event)
+            return event.isAccepted()
+        return super().eventFilter(watched, event)
 
     def _get_light_progress(self) -> float:
         return self._light_progress
@@ -118,6 +192,11 @@ class _LyricsCanvas(QWidget):
             self._set_light_progress(1.0)
 
     def set_lyrics(self, lyrics: Optional[Lyrics]) -> None:
+        self._follow_timer.stop()
+        self._scrollbar_hide_timer.stop()
+        self._scrollbar.hide()
+        self._manual_scroll = False
+        self._drag_start_y = None
         self._lyrics = lyrics
         self._current_index = -1
         self._scroll = 0.0
@@ -128,6 +207,7 @@ class _LyricsCanvas(QWidget):
         self._anim.stop()
         self._set_spotlight(-1, animate=False)
         self._synced = bool(lyrics and lyrics.is_synced())
+        self._sync_scrollbar()
         if self._synced:
             self.setCursor(Qt.CursorShape.PointingHandCursor)
         elif self._lyrics and len(self._lyrics) > 0:
@@ -147,6 +227,8 @@ class _LyricsCanvas(QWidget):
             index,
             animate=animate and abs(index - old_index) <= LYRIC_ANIMATE_MAX_LINE_JUMP,
         )
+        if self._manual_scroll:
+            return
         target = self._target_scroll()
         # A seek must also cancel any unfinished animation to the previous line.
         self._anim.stop()
@@ -181,8 +263,9 @@ class _LyricsCanvas(QWidget):
 
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)
+        self._scrollbar.setGeometry(self.width() - 12, 4, 8, max(0, self.height() - 8))
         self._anim.stop()
-        if self._synced:
+        if self._synced and not self._manual_scroll:
             self._set_scroll(self._target_scroll())
         else:
             self._clamp_scroll()
@@ -302,6 +385,8 @@ class _LyricsCanvas(QWidget):
         if e.button() != Qt.MouseButton.LeftButton:
             return
         if self._synced:
+            if self._manual_scroll:
+                self._follow_timer.start()
             return
         self._drag_start_y = e.position().y()
         self._drag_start_scroll = self._scroll
@@ -312,6 +397,7 @@ class _LyricsCanvas(QWidget):
             dy = e.position().y() - self._drag_start_y
             self._set_scroll(self._drag_start_scroll - dy)
             self._clamp_scroll()
+            self._begin_manual_scroll()
 
     def mouseReleaseEvent(self, e):  # noqa: N802
         if e.button() != Qt.MouseButton.LeftButton:
@@ -326,6 +412,8 @@ class _LyricsCanvas(QWidget):
                 return
             return
         if self._synced:
+            if self._manual_scroll:
+                self._follow_timer.start()
             clicked_y = e.position().y() - LYRIC_VERTICAL_MARGIN + self._scroll
             y_acc = 0.0
             for i in range(len(self._lyrics)):
@@ -336,12 +424,13 @@ class _LyricsCanvas(QWidget):
                 y_acc += bh
 
     def wheelEvent(self, e):  # noqa: N802
-        if self._synced or self._lyrics is None:
+        if not self._lyrics:
             super().wheelEvent(e)
             return
-        delta = e.angleDelta().y()
-        self._set_scroll(self._scroll - delta * 0.5)
-        self._clamp_scroll()
+        delta = e.pixelDelta().y() or e.angleDelta().y() * 0.5
+        if delta:
+            self._begin_manual_scroll()
+            self._set_scroll(max(0.0, min(self._scroll - delta, self._max_scroll())))
         e.accept()
 
     def _clamp_scroll(self) -> None:
@@ -353,6 +442,7 @@ class _LyricsCanvas(QWidget):
             self._scroll = 0.0
         elif self._scroll > max_scroll:
             self._scroll = max_scroll
+        self._sync_scrollbar()
         self.update()
 
 
