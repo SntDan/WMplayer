@@ -29,8 +29,10 @@ from .theme import Theme
 LYRIC_VISUAL_LEAD_MS = 240
 LYRIC_ANIMATE_MAX_LINE_JUMP = 2
 LYRIC_TEXT_CLIP_PAD = 3
-LYRIC_SCROLL_DURATION_MS = 360
-LYRIC_VERTICAL_MARGIN = 8
+LYRIC_SCROLL_DURATION_MS = 300
+LYRIC_LIGHT_DURATION_MS = 180
+LYRIC_INTRO_FADE_MS = 180
+LYRIC_VERTICAL_MARGIN = 10
 
 
 class _LyricsCanvas(QWidget):
@@ -46,14 +48,17 @@ class _LyricsCanvas(QWidget):
         self._scroll: float = 0.0
         self._anim = QPropertyAnimation(self, b"scroll")
         self._anim.setDuration(LYRIC_SCROLL_DURATION_MS)
-        self._anim.setEasingCurve(QEasingCurve.Type.InOutSine)
+        self._anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        self._spotlight_index = -1
+        self._light_weights: dict[int, float] = {}
+        self._light_start: dict[int, float] = {}
+        self._light_progress = 1.0
+        self._light_anim = QPropertyAnimation(self, b"light_progress")
+        self._light_anim.setEasingCurve(QEasingCurve.Type.InOutQuint)
         self._font = QFont()
-        self._font.setPointSize(16)
+        self._font.setPointSize(17)
         self._font.setBold(True)
-        self._font_active = QFont()
-        self._font_active.setPointSize(17)
-        self._font_active.setBold(True)
-        self._row_gap = 6
+        self._row_gap = 16
         self._text_margin = 24
 
         self._heights: list[float] = []
@@ -75,6 +80,43 @@ class _LyricsCanvas(QWidget):
 
     scroll = pyqtProperty(float, fget=_get_scroll, fset=_set_scroll)
 
+    def _get_light_progress(self) -> float:
+        return self._light_progress
+
+    def _set_light_progress(self, value: float) -> None:
+        self._light_progress = float(value)
+        self._light_weights = {
+            index: weight * (1.0 - value)
+            for index, weight in self._light_start.items()
+            if weight * (1.0 - value) > 0.0001
+        }
+        if self._spotlight_index >= 0:
+            index = self._spotlight_index
+            self._light_weights[index] = self._light_weights.get(index, 0.0) + value
+        self.update()
+
+    light_progress = pyqtProperty(
+        float, fget=_get_light_progress, fset=_set_light_progress
+    )
+
+    def _set_spotlight(
+        self, index: int, animate: bool = True,
+        duration: int = LYRIC_LIGHT_DURATION_MS,
+    ) -> None:
+        if index == self._spotlight_index and animate:
+            return
+        self._light_anim.stop()
+        # Retarget from the displayed light, even if the last fade is unfinished.
+        self._light_start = self._light_weights.copy()
+        self._spotlight_index = index
+        if animate:
+            self._light_anim.setDuration(max(1, duration))
+            self._light_anim.setStartValue(0.0)
+            self._light_anim.setEndValue(1.0)
+            self._light_anim.start()
+        else:
+            self._set_light_progress(1.0)
+
     def set_lyrics(self, lyrics: Optional[Lyrics]) -> None:
         self._lyrics = lyrics
         self._current_index = -1
@@ -84,6 +126,7 @@ class _LyricsCanvas(QWidget):
         self._offsets = []
         self._total_height = 0.0
         self._anim.stop()
+        self._set_spotlight(-1, animate=False)
         self._synced = bool(lyrics and lyrics.is_synced())
         if self._synced:
             self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -100,6 +143,10 @@ class _LyricsCanvas(QWidget):
             return
         old_index = self._current_index
         self._current_index = index
+        self._set_spotlight(
+            index,
+            animate=animate and abs(index - old_index) <= LYRIC_ANIMATE_MAX_LINE_JUMP,
+        )
         target = self._target_scroll()
         # A seek must also cancel any unfinished animation to the previous line.
         self._anim.stop()
@@ -140,12 +187,15 @@ class _LyricsCanvas(QWidget):
         else:
             self._clamp_scroll()
 
-    def _font_for(self, index: int) -> QFont:
-        return (
-            self._font_active
-            if (self._synced and index == self._current_index)
-            else self._font
-        )
+    def _alpha_for(self, index: int) -> int:
+        if not self._synced:
+            return 200
+        alpha = 60.0
+        for active, weight in self._light_weights.items():
+            distance = abs(index - active)
+            target = 255 if distance == 0 else (110 if distance == 1 else 60)
+            alpha += (target - 60) * weight
+        return round(alpha)
 
     def _ensure_heights(self) -> None:
         """Refresh cached lyric layout when inputs change."""
@@ -166,7 +216,6 @@ class _LyricsCanvas(QWidget):
         max_w = max(50, self.width() - 2 * self._text_margin)
         flags = int(Qt.TextFlag.TextWordWrap) | int(Qt.AlignmentFlag.AlignHCenter)
         fm_normal = QFontMetrics(self._font)
-        fm_active = QFontMetrics(self._font_active)
 
         acc = 0.0
         for line in self._lyrics.lines:
@@ -177,10 +226,6 @@ class _LyricsCanvas(QWidget):
                 continue
             bounds = QRect(0, 0, int(max_w), 10000)
             text_h = fm_normal.boundingRect(bounds, flags, text).height()
-            if self._synced:
-                # Reserve both font sizes, including wrapped lines, so changing
-                # the highlight never shifts the surrounding lyrics.
-                text_h = max(text_h, fm_active.boundingRect(bounds, flags, text).height())
             h = float(text_h + self._row_gap)
             self._heights.append(h)
             acc += h
@@ -236,21 +281,8 @@ class _LyricsCanvas(QWidget):
             if y_top > h:
                 break
 
-            is_current = self._synced and (i == self._current_index)
-            if is_current:
-                p.setFont(self._font_active)
-                p.setPen(QColor("#FFFFFF"))
-            else:
-                p.setFont(self._font)
-                if self._synced and self._current_index >= 0:
-                    distance = abs(i - self._current_index)
-                    alpha = max(60, 200 - distance * 35)
-                elif self._synced:
-                    # Before the first timed line, the spotlight is off.
-                    alpha = 60
-                else:
-                    alpha = 200
-                p.setPen(QColor(255, 255, 255, alpha))
+            p.setFont(self._font)
+            p.setPen(QColor(255, 255, 255, self._alpha_for(i)))
 
             text_h = block_h - self._row_gap
             rect = QRectF(
@@ -374,6 +406,15 @@ class LyricsPanel(QWidget):
             return
         idx = self._lyrics.index_at(position_ms + LYRIC_VISUAL_LEAD_MS)
         self.canvas.set_current_index(idx)
+        if idx < 0:
+            until_first = (
+                self._lyrics.lines[0].time_ms + self._lyrics.offset_ms
+                - position_ms - LYRIC_VISUAL_LEAD_MS
+            )
+            if until_first <= LYRIC_INTRO_FADE_MS:
+                self.canvas._set_spotlight(0, duration=until_first)
+            else:
+                self.canvas._set_spotlight(-1, animate=False)
 
     def has_lyrics(self) -> bool:
         return self._lyrics is not None and len(self._lyrics) > 0
