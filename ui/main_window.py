@@ -7,14 +7,16 @@ import time
 from typing import List, Optional
 
 from PyQt6.QtCore import (
+    QEvent,
     QObject,
     QRunnable,
     QSize,
     Qt,
     QThreadPool,
+    qWarning,
     pyqtSignal,
 )
-from PyQt6.QtGui import QKeySequence, QShortcut
+from PyQt6.QtGui import QGuiApplication, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QFrame,
@@ -230,6 +232,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("WMplayer")
         self.setMinimumSize(QSize(983, 760))
         self.resize(QSize(983, 760))
+        self._frame_dpr = self.devicePixelRatioF()
         self.setStyleSheet(GLOBAL_QSS)
         self._config = Config()
         set_language(str(self._config.get("language", "en")))
@@ -525,6 +528,37 @@ class MainWindow(QMainWindow):
             position_ms = int(self._config.get("last_position_ms", 0))
             if position_ms > 0:
                 self._engine.seek(position_ms)
+
+    def event(self, e):
+        if (
+            e.type() == QEvent.Type.DevicePixelRatioChange
+            and hasattr(self, "_frame_dpr")
+        ):
+            self._refresh_frame_for_dpi()
+        return super().event(e)
+
+    def _refresh_frame_for_dpi(self) -> None:
+        dpr = self.devicePixelRatioF()
+        if dpr == self._frame_dpr:
+            return
+        self._frame_dpr = dpr
+        if QGuiApplication.platformName() != "windows" or self.windowHandle() is None:
+            return
+        # QTBUG-142163: refresh native frame metrics before Qt applies the
+        # DPI-scaled geometry. Match QWindowsContext::forceNcCalcSize without
+        # replacing a window procedure or changing the window's position/size.
+        try:
+            import win32con
+            import win32gui
+
+            flags = (
+                win32con.SWP_FRAMECHANGED | win32con.SWP_NOACTIVATE
+                | win32con.SWP_NOMOVE | win32con.SWP_NOSIZE
+                | win32con.SWP_NOZORDER | win32con.SWP_NOOWNERZORDER
+            )
+            win32gui.SetWindowPos(int(self.winId()), 0, 0, 0, 0, 0, flags)
+        except Exception as exc:
+            qWarning(f"Could not refresh the window frame after DPI change: {exc}")
 
     def resizeEvent(self, e):  # noqa: N802
         super().resizeEvent(e)
