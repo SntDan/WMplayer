@@ -36,6 +36,7 @@ LYRIC_SCROLL_DURATION_MS = 300
 LYRIC_LIGHT_DURATION_MS = 180
 LYRIC_INTRO_FADE_MS = 180
 LYRIC_VERTICAL_MARGIN = 10
+LYRIC_FOCUS_HEIGHT_RATIO = 0.47
 LYRIC_SCROLLBAR_HIDE_MS = 1000
 LYRIC_FOLLOW_RESUME_MS = 5000
 
@@ -247,17 +248,26 @@ class _LyricsCanvas(QWidget):
 
     def _max_scroll(self) -> float:
         self._ensure_heights()
-        return max(0.0, self._total_height + 2 * LYRIC_VERTICAL_MARGIN - self.height())
+        bottom_margin = LYRIC_VERTICAL_MARGIN
+        if self._synced and self._heights:
+            # Let the last row reach the same focus position as earlier rows.
+            bottom_margin = max(
+                bottom_margin,
+                self.height() * (1 - LYRIC_FOCUS_HEIGHT_RATIO) - self._heights[-1] / 2,
+            )
+        return max(
+            0.0, self._total_height + LYRIC_VERTICAL_MARGIN + bottom_margin - self.height()
+        )
 
     def _target_scroll(self) -> float:
-        """Start at the top; follow the active row only after it reaches mid-view."""
+        """Start at the top; follow the active row once it reaches the focus position."""
         if not self._lyrics or not 0 <= self._current_index < len(self._lyrics):
             return 0.0
         target = (
             LYRIC_VERTICAL_MARGIN
             + self._block_top(self._current_index)
             + self._block_height(self._current_index) / 2
-            - self.height() / 2
+            - self.height() * LYRIC_FOCUS_HEIGHT_RATIO
         )
         return max(0.0, min(target, self._max_scroll()))
 
