@@ -246,6 +246,12 @@ class _LyricsCanvas(QWidget):
             self._set_scroll(target)
         self.update()
 
+    def follow_line(self, index: int) -> None:
+        """Resume following a clicked line, animating from the displayed position."""
+        self._current_index = index
+        self._set_spotlight(index)
+        self._resume_follow()
+
     def _max_scroll(self) -> float:
         self._ensure_heights()
         bottom_margin = LYRIC_VERTICAL_MARGIN
@@ -522,6 +528,7 @@ class LyricsPanel(QWidget):
     def _on_line_clicked(self, idx: int) -> None:
         if self._lyrics and 0 <= idx < len(self._lyrics):
             line = self._lyrics.lines[idx]
+            self.canvas.follow_line(idx)
             self.seek_to_ms.emit(
                 max(0, line.time_ms + self._lyrics.offset_ms - LYRIC_VISUAL_LEAD_MS)
             )
