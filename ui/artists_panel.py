@@ -27,6 +27,7 @@ class ArtistsPanel(QWidget):
     play_paths_sequential = pyqtSignal(list, int)
     play_paths_shuffled = pyqtSignal(list)
     enqueue_paths = pyqtSignal(list)
+    play_next_paths = pyqtSignal(list)
     add_paths_to_playlist = pyqtSignal(list)
 
     def __init__(self, library: Library, parent: Optional[QWidget] = None) -> None:
@@ -67,6 +68,7 @@ class ArtistsPanel(QWidget):
         )
         self.albums_subpanel.play_paths_shuffled.connect(self.play_paths_shuffled.emit)
         self.albums_subpanel.enqueue_paths.connect(self.enqueue_paths.emit)
+        self.albums_subpanel.play_next_paths.connect(self.play_next_paths.emit)
         self.albums_subpanel.add_paths_to_playlist.connect(
             self.add_paths_to_playlist.emit
         )

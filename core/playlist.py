@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import random
+from collections import defaultdict, deque
+from copy import copy
 from enum import Enum
 from typing import List, Optional
 
@@ -69,7 +71,7 @@ class Playlist(QObject):
         self, tracks: List[TrackMetadata], start_index: int = -1
     ) -> int:
         """Replace the queue with parsed tracks."""
-        self._tracks = list(tracks)
+        self._tracks = [copy(track) for track in tracks]
         if 0 <= start_index < len(self._tracks):
             self._current_index = start_index
         else:
@@ -89,23 +91,46 @@ class Playlist(QObject):
         original_tracks: Optional[List[TrackMetadata]] = None,
     ) -> None:
         """Restore a parsed queue snapshot."""
-        self._tracks = list(tracks)
-        self._original_order = list(original_tracks) if original_tracks else None
+        self._tracks = [copy(track) for track in tracks]
+        self._original_order = None
+        if original_tracks:
+            occurrences = defaultdict(deque)
+            for track in self._tracks:
+                occurrences[track.path].append(track)
+            self._original_order = []
+            for track in original_tracks:
+                if occurrences[track.path]:
+                    self._original_order.append(occurrences[track.path].popleft())
         self._current_index = -1
         self.changed.emit()
 
     def append_tracks(self, tracks: List[TrackMetadata]) -> int:
-        existing = {t.path for t in self._tracks}
-        added = 0
-        for t in tracks:
-            if t.path in existing:
-                continue
-            self._tracks.append(t)
-            existing.add(t.path)
-            added += 1
-        if added:
-            self.changed.emit()
-        return added
+        """Append playback occurrences, including songs already in the queue."""
+        return self._insert_tracks(tracks, len(self._tracks))
+
+    def insert_next(self, tracks: List[TrackMetadata]) -> int:
+        """Play these tracks after the current song, preserving selection order."""
+        return self._insert_tracks(tracks, self._current_index + 1, play_next=True)
+
+    def _insert_tracks(
+        self, tracks: List[TrackMetadata], index: int, *, play_next: bool = False
+    ) -> int:
+        # Each occurrence needs its own identity for shuffle and removal.
+        additions = [copy(track) for track in tracks]
+        if not additions:
+            return 0
+        if self._original_order is not None:
+            if not play_next:
+                original_index = len(self._original_order)
+            else:
+                original_index = next(
+                    (i + 1 for i, track in enumerate(self._original_order)
+                     if track is self.current), 0
+                )
+            self._original_order[original_index:original_index] = additions
+        self._tracks[index:index] = additions
+        self.changed.emit()
+        return len(additions)
 
     def remove(self, index: int) -> None:
         if 0 <= index < len(self._tracks):
@@ -232,7 +257,7 @@ class Playlist(QObject):
             return
         self._original_order = list(self._tracks)
         cur = self.current
-        rest = [t for t in self._tracks if t is not cur]
+        rest = [t for i, t in enumerate(self._tracks) if i != self._current_index]
         random.shuffle(rest)
         if cur is not None:
             self._tracks = [cur] + rest
@@ -254,8 +279,10 @@ class Playlist(QObject):
         self._original_order = None
         if cur is not None:
             try:
-                self._current_index = self._tracks.index(cur)
-            except ValueError:
+                self._current_index = next(
+                    i for i, track in enumerate(self._tracks) if track is cur
+                )
+            except StopIteration:
                 self._current_index = -1
         else:
             self._current_index = -1

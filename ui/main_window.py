@@ -261,6 +261,8 @@ class MainWindow(QMainWindow):
         self._restore_state()
 
     def _build_ui(self) -> None:
+        # Reserve status space before the first message can resize the player.
+        self.statusBar().setSizeGripEnabled(False)
         central = QWidget(self)
         self.setCentralWidget(central)
         layout = QHBoxLayout(central)
@@ -351,6 +353,7 @@ class MainWindow(QMainWindow):
 
         self.library_panel.play_paths_now.connect(self._play_paths_now)
         self.library_panel.enqueue_paths.connect(self._enqueue_paths)
+        self.library_panel.play_next_paths.connect(self._play_next_paths)
         self.library_panel.add_paths_to_playlist.connect(
             self._add_paths_to_some_playlist
         )
@@ -360,6 +363,7 @@ class MainWindow(QMainWindow):
 
         self.albums_panel.play_paths_sequential.connect(self._play_paths_sequential_now)
         self.albums_panel.enqueue_paths.connect(self._enqueue_paths)
+        self.albums_panel.play_next_paths.connect(self._play_next_paths)
         self.albums_panel.add_paths_to_playlist.connect(
             self._add_paths_to_some_playlist
         )
@@ -369,6 +373,7 @@ class MainWindow(QMainWindow):
         )
         self.artists_panel.play_paths_shuffled.connect(self._play_paths_shuffled_now)
         self.artists_panel.enqueue_paths.connect(self._enqueue_paths)
+        self.artists_panel.play_next_paths.connect(self._play_next_paths)
         self.artists_panel.add_paths_to_playlist.connect(
             self._add_paths_to_some_playlist
         )
@@ -519,7 +524,10 @@ class MainWindow(QMainWindow):
         )
 
         last_path = self._config.get("last_track_path", "")
-        index = self._playlist.find_index_by_path(last_path) if last_path else -1
+        index = self._config.get("last_queue_index", -1)
+        track = self._playlist.get(index) if isinstance(index, int) else None
+        if track is None or track.path != last_path:
+            index = self._playlist.find_index_by_path(last_path) if last_path else -1
         if index < 0:
             return
         self._autoplay_after_load = False
@@ -587,6 +595,7 @@ class MainWindow(QMainWindow):
             self._config.set("last_position_ms", self._engine.get_position())
             current = self._playlist.current
             self._config.set("last_track_path", current.path if current else "")
+            self._config.set("last_queue_index", self._playlist.current_index)
             self._config.save()
             m3u.write_file(QUEUE_CACHE_PATH, "queue", self._playlist.paths)
             self._save_original_queue()
@@ -628,8 +637,11 @@ class MainWindow(QMainWindow):
             self._play_index(prv)
 
     def _on_backend_track_changed(self, path: str) -> None:
-        idx = self._playlist.find_index_by_path(path)
-        if idx < 0 or idx == self._playlist.current_index:
+        idx = self._playlist.next_index(auto=True)
+        track = self._playlist.get(idx) if idx is not None else None
+        if track is None or track.path != path:
+            return
+        if idx == self._playlist.current_index:
             return
         self._autoplay_after_load = self._engine.is_playing()
         self._playlist.set_current(idx)
@@ -820,6 +832,12 @@ class MainWindow(QMainWindow):
         tracks = self._tracks_from_paths(paths)
         n = self._playlist.append_tracks(tracks)
         self.statusBar().showMessage(tr("added_to_queue_status", n=n), 3000)
+
+    def _play_next_paths(self, paths: List[str]) -> None:
+        if not paths:
+            return
+        n = self._playlist.insert_next(self._tracks_from_paths(paths))
+        self.statusBar().showMessage(tr("play_next_status", n=n), 3000)
 
     def _add_paths_to_some_playlist(self, paths: List[str]) -> None:
         if not paths:

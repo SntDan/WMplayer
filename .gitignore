@@ -9,7 +9,8 @@ __pycache__/
 htmlcov/
 
 # Tests
-/tests/
+/tests/*
+!/tests/test_playback_queue.py
 /test/
 
 # Local development and generated builds
@@ -21,3 +22,4 @@ venv/
 /dist/
 *.egg-info/
 /mpv/
+/tests

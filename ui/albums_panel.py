@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QListWidgetItem,
+    QMenu,
     QPushButton,
     QSizePolicy,
     QStackedWidget,
@@ -66,6 +67,7 @@ class AlbumsPanel(QWidget):
     play_paths_sequential = pyqtSignal(list, int)
     play_paths_shuffled = pyqtSignal(list)
     enqueue_paths = pyqtSignal(list)
+    play_next_paths = pyqtSignal(list)
     add_paths_to_playlist = pyqtSignal(list)
     back_to_artists_requested = pyqtSignal()
 
@@ -154,6 +156,8 @@ class AlbumsPanel(QWidget):
         ) = _add_detail_header(l1, spacing=16)
 
         self.list_tracks = cover_list()
+        self.list_tracks.setSelectionMode(self.list_tracks.SelectionMode.ExtendedSelection)
+        self.list_tracks.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         l1.addWidget(self.list_tracks)
 
         h_back = QHBoxLayout()
@@ -183,6 +187,7 @@ class AlbumsPanel(QWidget):
         self.btn_back.clicked.connect(lambda: self.stack.setCurrentIndex(0))
         self.list_tracks.itemDoubleClicked.connect(self._on_track_clicked)
         self.btn_play_all.clicked.connect(self._on_play_all)
+        self.list_tracks.customContextMenuRequested.connect(self._on_track_context_menu)
 
     def refresh(self) -> None:
         self._albums_tracks = _group_tracks_by_album(
@@ -264,6 +269,24 @@ class AlbumsPanel(QWidget):
         except StopIteration:
             track_idx = 0
         self._play_from_album(album, track_idx)
+
+    def _on_track_context_menu(self, pos) -> None:
+        item = self.list_tracks.itemAt(pos)
+        if item is None:
+            return
+        if not item.isSelected():
+            self.list_tracks.setCurrentItem(item)
+        paths = [self.list_tracks.item(i).data(Qt.ItemDataRole.UserRole)
+                 for i in range(self.list_tracks.count())
+                 if self.list_tracks.item(i).isSelected()]
+        menu = QMenu(self)
+        play_next = menu.addAction(tr("play_next"))
+        play_last = menu.addAction(tr("play_last"))
+        action = menu.exec(self.list_tracks.viewport().mapToGlobal(pos))
+        if action == play_next:
+            self.play_next_paths.emit(paths)
+        elif action == play_last:
+            self.enqueue_paths.emit(paths)
 
     def _on_play_all(self) -> None:
         album = getattr(self, "_current_album", "")

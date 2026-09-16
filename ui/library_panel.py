@@ -39,6 +39,7 @@ from ui.theme import BTN_QSS as _BTN_QSS
 class LibraryPanel(QWidget):
     play_paths_now = pyqtSignal(list, int)
     enqueue_paths = pyqtSignal(list)
+    play_next_paths = pyqtSignal(list)
     add_paths_to_playlist = pyqtSignal(list)
     open_artist_requested = pyqtSignal(str)
     open_album_requested = pyqtSignal(str)
@@ -272,30 +273,36 @@ class LibraryPanel(QWidget):
         item = self.list.itemAt(pos)
         if item is None:
             return
-        self.list.setCurrentItem(item)
+        if not item.isSelected():
+            self.list.setCurrentItem(item)
         kind = item.data(self._ROLE_RESULT_KIND)
         menu = QMenu(self)
         a_open = None
-        a_play = a_enq = a_add = None
+        a_play = a_next = a_enq = a_add = None
         if kind == "artist":
             a_open = menu.addAction(tr("open_artist"))
         elif kind == "album":
             a_open = menu.addAction(tr("open_album"))
         elif kind == "song":
             a_play = menu.addAction(tr("play_now"))
-            a_enq = menu.addAction(tr("enqueue"))
+            a_next = menu.addAction(tr("play_next"))
+            a_enq = menu.addAction(tr("play_last"))
             a_add = menu.addAction(tr("add_to_playlist"))
         else:
             return
-        act = menu.exec(self.list.mapToGlobal(pos))
+        paths = self._selected_paths()
+        act = menu.exec(self.list.viewport().mapToGlobal(pos))
+        if act is None:
+            return
         if act == a_open:
             self._on_double_click(item)
             return
-        paths = self._selected_paths()
         if not paths:
             return
         if act == a_play:
             self.play_paths_now.emit(paths, 0)
+        elif act == a_next:
+            self.play_next_paths.emit(paths)
         elif act == a_enq:
             self.enqueue_paths.emit(paths)
         elif act == a_add:
