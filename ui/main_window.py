@@ -230,8 +230,8 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("WMplayer")
-        self.setMinimumSize(QSize(983, 760))
-        self.resize(QSize(983, 760))
+        self.setMinimumSize(QSize(983, 785))
+        self.resize(QSize(983, 785))
         self._frame_dpr = self.devicePixelRatioF()
         self.setStyleSheet(GLOBAL_QSS)
         self._config = Config()
