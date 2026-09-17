@@ -230,8 +230,8 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("WMplayer")
-        self.setMinimumSize(QSize(983, 785))
-        self.resize(QSize(983, 785))
+        self.setMinimumSize(QSize(983, 760))
+        self.resize(QSize(983, 760))
         self._frame_dpr = self.devicePixelRatioF()
         self.setStyleSheet(GLOBAL_QSS)
         self._config = Config()
@@ -261,8 +261,6 @@ class MainWindow(QMainWindow):
         self._restore_state()
 
     def _build_ui(self) -> None:
-        # Reserve status space before the first message can resize the player.
-        self.statusBar().setSizeGripEnabled(False)
         central = QWidget(self)
         self.setCentralWidget(central)
         layout = QHBoxLayout(central)
@@ -330,7 +328,7 @@ class MainWindow(QMainWindow):
         self._engine.track_finished.connect(self._on_track_finished)
         self._engine.backend_track_changed.connect(self._on_backend_track_changed)
         self._engine.error_occurred.connect(
-            lambda msg: self.statusBar().showMessage(tr("error_status", msg=msg), 4000)
+            lambda msg: qWarning(f"Playback error: {msg}")
         )
 
         self._playlist.current_changed.connect(self._on_current_changed)
@@ -780,9 +778,7 @@ class MainWindow(QMainWindow):
         if not name:
             return
         ok = self._store.save(name, self._playlist.paths)
-        if ok:
-            self.statusBar().showMessage(tr("saved_playlist_status", name=name), 3000)
-        else:
+        if not ok:
             QMessageBox.warning(self, tr("save_failed_title"), tr("save_failed_msg"))
 
     def _tracks_from_paths(self, paths):
@@ -830,14 +826,12 @@ class MainWindow(QMainWindow):
         if not paths:
             return
         tracks = self._tracks_from_paths(paths)
-        n = self._playlist.append_tracks(tracks)
-        self.statusBar().showMessage(tr("added_to_queue_status", n=n), 3000)
+        self._playlist.append_tracks(tracks)
 
     def _play_next_paths(self, paths: List[str]) -> None:
         if not paths:
             return
-        n = self._playlist.insert_next(self._tracks_from_paths(paths))
-        self.statusBar().showMessage(tr("play_next_status", n=n), 3000)
+        self._playlist.insert_next(self._tracks_from_paths(paths))
 
     def _add_paths_to_some_playlist(self, paths: List[str]) -> None:
         if not paths:
@@ -848,9 +842,6 @@ class MainWindow(QMainWindow):
             if name is None:
                 return
             self._store.save(name, paths)
-            self.statusBar().showMessage(
-                tr("create_playlist_status", name=name, n=len(paths)), 3000
-            )
             return
         new_label = f"<{tr('new_playlist')}>"
         choice, ok = QInputDialog.getItem(
@@ -884,9 +875,6 @@ class MainWindow(QMainWindow):
                 merged.append(path)
                 seen.add(path)
         self._store.save(name, merged)
-        self.statusBar().showMessage(
-            tr("added_to_playlist_status", n=len(paths), name=name), 3000
-        )
 
     def _rescan_library(self) -> None:
         self._library.set_folders(self._config.library_folders_effective())
