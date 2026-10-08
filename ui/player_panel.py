@@ -314,7 +314,6 @@ class PlayerPanel(QWidget):
 
     def _refresh_mode_buttons(self) -> None:
         repeat_on = self._repeat in (RepeatMode.ALL, RepeatMode.ONE)
-        self.btn_shuffle.set_active(self._shuffled)
         self.btn_shuffle.set_enabled_visual(self._shuffled)
         self.btn_repeat.set_active(repeat_on)
         self.btn_repeat.set_enabled_visual(repeat_on)
