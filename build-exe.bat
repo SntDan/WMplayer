@@ -52,7 +52,7 @@ echo [2/2] Building WMplayer.exe...
 if exist "WMplayer.spec" (
     "%WMPLAYER_PYTHON%" %WMPLAYER_PYTHON_ARGS% -m PyInstaller --noconfirm --clean --distpath "%CD%\dist" --workpath "%CD%\build" "WMplayer.spec"
 ) else (
-    "%WMPLAYER_PYTHON%" %WMPLAYER_PYTHON_ARGS% -m PyInstaller --noconfirm --clean --onefile --windowed --name WMplayer --distpath "%CD%\dist" --workpath "%CD%\build" "WMplayer.py"
+    "%WMPLAYER_PYTHON%" %WMPLAYER_PYTHON_ARGS% -m PyInstaller --noconfirm --clean --onefile --windowed --name WMplayer --icon "assets\wmplayer.ico" --add-data "assets\wmplayer.ico;assets" --distpath "%CD%\dist" --workpath "%CD%\build" "WMplayer.py"
 )
 if errorlevel 1 goto failed
 if not exist "%WMPLAYER_BUILD_EXE%" (

@@ -28,6 +28,7 @@ def _set_windows_app_id() -> None:
 def main() -> int:
     _set_windows_app_id()
 
+    from PyQt6.QtGui import QIcon
     from PyQt6.QtWidgets import QApplication
 
     from ui.main_window import MainWindow
@@ -37,6 +38,7 @@ def main() -> int:
 
     # Let Qt 6 configure per-monitor DPI awareness before creating any windows.
     app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon(os.path.join(_HERE, "assets", "wmplayer.ico")))
     win = MainWindow()
     win.show()
     return app.exec()
