@@ -11,11 +11,12 @@ from PyQt6.QtGui import (
     QFont,
     QFontMetrics,
     QPainter,
-    QPen,
     QPixmap,
     QPixmapCache,
 )
 from PyQt6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem
+
+from .hr_badge import HR_BADGE_HEIGHT, HR_BADGE_WIDTH, paint_hr_badge
 
 QPixmapCache.setCacheLimit(60 * 1024)  # 60 MB
 
@@ -28,10 +29,9 @@ ROLE_THUMB_PATHS = Qt.ItemDataRole.UserRole + 5
 ROLE_SECTION_HEADER = Qt.ItemDataRole.UserRole + 6
 
 
-_HR_BADGE_W = 26
-_HR_BADGE_H = 16
-_HR_GOLD = QColor("#D4AF37")
 _SEPARATOR_COLOR = QColor("#202020")
+_HR_BADGE_SLOT_W = 26  # Keep the original text boundary independent of badge size.
+_HR_BADGE_SCALE = 0.875
 
 
 class CoverRowDelegate(QStyledItemDelegate):
@@ -40,7 +40,7 @@ class CoverRowDelegate(QStyledItemDelegate):
     THUMB_PX = 52
     PAD = 10
     ROW_H = 52
-    HR_RESERVED_W = _HR_BADGE_W + 12
+    HR_RESERVED_W = _HR_BADGE_SLOT_W + 12
 
     def sizeHint(self, option: QStyleOptionViewItem, index) -> QSize:  # noqa: N802
         if bool(index.data(ROLE_SECTION_HEADER)):
@@ -87,11 +87,22 @@ class CoverRowDelegate(QStyledItemDelegate):
 
         is_hr = bool(index.data(ROLE_IS_HR))
         badge_right = rect.right() - 14
-        badge_left = badge_right - _HR_BADGE_W
+        badge_left = badge_right - _HR_BADGE_SLOT_W
         if is_hr:
-            badge_y = rect.top() + (self.THUMB_PX - _HR_BADGE_H) // 2
-            badge_rect = QRect(badge_left, badge_y, _HR_BADGE_W, _HR_BADGE_H)
-            self._paint_hr_badge(painter, badge_rect, option.font)
+            painter.save()
+            painter.translate(
+                badge_left + _HR_BADGE_SLOT_W / 2,
+                rect.top() + self.THUMB_PX / 2,
+            )
+            painter.scale(_HR_BADGE_SCALE, _HR_BADGE_SCALE)
+            badge_rect = QRectF(
+                -HR_BADGE_WIDTH / 2,
+                -HR_BADGE_HEIGHT / 2,
+                HR_BADGE_WIDTH,
+                HR_BADGE_HEIGHT,
+            )
+            paint_hr_badge(painter, badge_rect)
+            painter.restore()
 
         text_x = thumb_rect.right() + self.PAD
         text_w = badge_left - self.PAD - text_x
@@ -148,26 +159,6 @@ class CoverRowDelegate(QStyledItemDelegate):
         y = rect.bottom()
         painter.drawLine(rect.left(), y, rect.right(), y)
 
-        painter.restore()
-
-    @staticmethod
-    def _paint_hr_badge(painter: QPainter, rect: QRect, base_font: QFont) -> None:
-        painter.save()
-        pen = QPen(_HR_GOLD)
-        pen.setWidthF(1.2)
-        painter.setPen(pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawRoundedRect(
-            QRectF(rect.x() + 0.5, rect.y() + 0.5, rect.width() - 1, rect.height() - 1),
-            3,
-            3,
-        )
-        f = QFont(base_font)
-        f.setPointSize(8)
-        f.setBold(True)
-        painter.setFont(f)
-        painter.setPen(_HR_GOLD)
-        painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, "HR")
         painter.restore()
 
     @classmethod

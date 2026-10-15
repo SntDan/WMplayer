@@ -134,6 +134,8 @@ Plain text lyric files can also be displayed and scrolled manually, but they do 
 
 ## Build
 
+On Windows, run `build-exe.bat` from the project folder. It checks dependencies, closes the running `dist\WMplayer.exe`, and builds using `WMplayer.spec` when available. The output is `dist\WMplayer.exe`.
+
 ```bash
 pyinstaller --noconfirm --onefile --windowed --name WMplayer WMplayer.py
 ```
@@ -277,6 +279,8 @@ Song.lrc
 ```
 
 ## 打包
+
+Windows 下双击项目目录中的 `build-exe.bat`：脚本会检查依赖，关闭正在运行的本项目 `dist\WMplayer.exe`，然后优先使用现有 `WMplayer.spec` 打包。输出为 `dist\WMplayer.exe`。
 
 ```bash
 pyinstaller --noconfirm --onefile --windowed --name WMplayer WMplayer.py

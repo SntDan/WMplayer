@@ -30,6 +30,7 @@ except ImportError:  # pragma: no cover
     _HAS_QTSVG = False
 from PyQt6.QtWidgets import QLabel, QPushButton, QSizePolicy, QWidget
 
+from .hr_badge import HR_BADGE_HEIGHT, HR_BADGE_WIDTH, paint_hr_badge
 from .theme import Theme
 
 LUCIDE_STROKE: dict[str, str] = {
@@ -434,12 +435,11 @@ class ScrollingLabel(QLabel):
 class HRBadge(QWidget):
     """High-resolution audio badge."""
 
-    GOLD = QColor("#D4AF37")
-
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._visible = False
-        self.setFixedSize(QSize(32, 18))
+        # Match the 32 px library button so badge styling cannot shift song text.
+        self.setFixedSize(QSize(32, HR_BADGE_HEIGHT + 2))
 
     def set_visible_hr(self, visible: bool) -> None:
         if self._visible != visible:
@@ -450,20 +450,8 @@ class HRBadge(QWidget):
         if not self._visible:
             return
         p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
-        bw, bh = 26.0, 16.0
+        bw, bh = HR_BADGE_WIDTH, HR_BADGE_HEIGHT
         cx, cy = self.width() / 2, self.height() / 2
         rect = QRectF(cx - bw / 2, cy - bh / 2, bw, bh)
-        pen = QPen(self.GOLD)
-        pen.setWidthF(1.4)
-        p.setPen(pen)
-        p.setBrush(Qt.BrushStyle.NoBrush)
-        p.drawRoundedRect(rect, 3, 3)
-        f = QFont()
-        f.setPointSize(9)
-        f.setBold(True)
-        p.setFont(f)
-        p.setPen(self.GOLD)
-        p.drawText(rect, Qt.AlignmentFlag.AlignCenter, "HR")
+        paint_hr_badge(p, rect)
         p.end()
