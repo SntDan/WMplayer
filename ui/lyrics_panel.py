@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from bisect import bisect_left
 from typing import Optional
 
 from PyQt6.QtCore import (
@@ -366,9 +367,12 @@ class _LyricsCanvas(QWidget):
             | int(Qt.AlignmentFlag.AlignVCenter)
         )
 
-        y_top = LYRIC_VERTICAL_MARGIN - self._scroll
-        for i, line in enumerate(self._lyrics.lines):
-            block_h = self._block_height(i)
+        self._ensure_heights()
+        first = max(0, bisect_left(self._offsets, self._scroll - LYRIC_VERTICAL_MARGIN) - 1)
+        y_top = LYRIC_VERTICAL_MARGIN + self._offsets[first] - self._scroll
+        for i in range(first, len(self._lyrics)):
+            line = self._lyrics.lines[i]
+            block_h = self._heights[i]
             text = line.text
             if not text:
                 y_top += block_h
@@ -421,11 +425,8 @@ class _LyricsCanvas(QWidget):
         if self._lyrics is None:
             return
         if self._drag_start_y is not None:
-            moved = abs(e.position().y() - self._drag_start_y) > 4
             self._drag_start_y = None
             self.setCursor(Qt.CursorShape.OpenHandCursor)
-            if moved:
-                return
             return
         if self._synced:
             if self._manual_scroll:
@@ -470,6 +471,7 @@ class LyricsPanel(QWidget):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._lyrics: Optional[Lyrics] = None
+        self._track_label = ""
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -500,15 +502,15 @@ class LyricsPanel(QWidget):
         self.canvas.set_lyrics(lyrics)
         if lyrics is None or len(lyrics) == 0:
             self.info_label.setText(tr("no_lrc"))
-        elif lyrics.is_synced():
-            self.info_label.setText(f"{track_label}")
+        elif self.canvas._synced:
+            self.info_label.setText(track_label)
         else:
             self.info_label.setText(f"{track_label} - {tr('plain_text')}")
 
     def update_position(self, position_ms: int) -> None:
         if self._lyrics is None or len(self._lyrics) == 0:
             return
-        if not self._lyrics.is_synced():
+        if not self.canvas._synced:
             return
         idx = self._lyrics.index_at(position_ms + LYRIC_VISUAL_LEAD_MS)
         self.canvas.set_current_index(idx)
@@ -535,4 +537,4 @@ class LyricsPanel(QWidget):
 
     def retranslate(self) -> None:
         self.title_label.setText(tr("lyrics"))
-        self.set_lyrics(self._lyrics, getattr(self, "_track_label", ""))
+        self.set_lyrics(self._lyrics, self._track_label)

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import time
 from typing import Dict, List, Optional
 
 from PyQt6.QtCore import QObject, QRunnable, QThreadPool, pyqtSignal
@@ -15,7 +14,7 @@ from core.thumbnails import ensure_thumb, thumb_exists
 
 class _ScanSignals(QObject):
     progress = pyqtSignal(int, int)  # done, total
-    finished = pyqtSignal(list)  # List[TrackMetadata]
+    finished = pyqtSignal(list, dict)  # tracks and their observed modification times
 
 
 class _ScanRunnable(QRunnable):
@@ -33,6 +32,7 @@ class _ScanRunnable(QRunnable):
     def run(self) -> None:
         files = _discover_audio_files(self._folders)
         results: List[TrackMetadata] = []
+        mtimes: Dict[str, float] = {}
         total = len(files)
         for i, path in enumerate(files):
             try:
@@ -43,11 +43,10 @@ class _ScanRunnable(QRunnable):
             if metadata is None:
                 continue
             results.append(metadata)
+            mtimes[path] = mtime
 
             if (i + 1) % 25 == 0 or (i + 1) == total:
                 self._signals.progress.emit(i + 1, total)
-            if (i + 1) % 10 == 0:
-                time.sleep(0.001)
 
         results.sort(
             key=lambda t: (
@@ -55,7 +54,7 @@ class _ScanRunnable(QRunnable):
                 (t.artist or "").lower(),
             )
         )
-        self._signals.finished.emit(results)
+        self._signals.finished.emit(results, mtimes)
 
 
 def _discover_audio_files(folders: List[str]) -> List[str]:
@@ -144,6 +143,7 @@ class Library(QObject):
         self._cache_path = cache_path
         self._folders: List[str] = []
         self._tracks: List[TrackMetadata] = []
+        self._mtimes: Dict[str, float] = {}
         self._display_tracks: List[TrackMetadata] = []
         self._path_map: Optional[Dict[str, TrackMetadata]] = None
         self._scanning = False
@@ -195,8 +195,9 @@ class Library(QObject):
         worker = _ScanRunnable(list(self._folders), cache, self._signals)
         QThreadPool.globalInstance().start(worker)
 
-    def _on_scan_finished(self, tracks) -> None:
+    def _on_scan_finished(self, tracks, mtimes: Dict[str, float]) -> None:
         self._tracks = list(tracks)
+        self._mtimes = mtimes
         self._path_map = None  # Invalidate the path index.
         self._rebuild_display()
         self._scanning = False
@@ -205,14 +206,10 @@ class Library(QObject):
         self.scan_finished.emit()
 
     def _build_cache_dict(self) -> Dict[str, dict]:
-        cache: Dict[str, dict] = {}
-        for t in self._tracks:
-            try:
-                mtime = os.path.getmtime(t.path)
-            except OSError:
-                continue
-            cache[t.path] = _metadata_to_cache(t, mtime)
-        return cache
+        return {
+            track.path: _metadata_to_cache(track, self._mtimes.get(track.path, 0.0))
+            for track in self._tracks
+        }
 
     def _load_cache(self) -> None:
         if not os.path.isfile(self._cache_path):
@@ -228,6 +225,7 @@ class Library(QObject):
             if not path or not os.path.isfile(path):
                 continue
             self._tracks.append(_metadata_from_cache(path, entry))
+            self._mtimes[path] = entry.get("mtime", 0.0)
 
     def _save_cache(self) -> None:
         try:
@@ -237,7 +235,7 @@ class Library(QObject):
                 "tracks": [
                     {
                         "path": t.path,
-                        **_metadata_to_cache(t, _safe_mtime(t.path)),
+                        **_metadata_to_cache(t, self._mtimes.get(t.path, 0.0)),
                     }
                     for t in self._tracks
                 ],
@@ -248,13 +246,6 @@ class Library(QObject):
             os.replace(tmp, self._cache_path)
         except Exception:
             pass
-
-
-def _safe_mtime(path: str) -> float:
-    try:
-        return os.path.getmtime(path)
-    except OSError:
-        return 0.0
 
 
 def _spec_score(t: TrackMetadata) -> tuple:

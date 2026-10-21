@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -55,6 +55,11 @@ class PlaylistStore(QObject):
     def list_names(self) -> List[str]:
         return [name for name, _ in self._collect_entries()]
 
+    def iter_playlists(self) -> Iterator[Tuple[str, List[str]]]:
+        """Read a single directory snapshot instead of rescanning per playlist."""
+        for name, path in self._collect_entries():
+            yield name, m3u.parse_file(path)
+
     def file_path(self, name: str) -> str:
         """Resolve or create a playlist path."""
         m = self._name_to_path()
@@ -64,10 +69,13 @@ class PlaylistStore(QObject):
 
     def is_writable(self, name: str) -> bool:
         """Return whether a playlist is in the writable folder."""
+        return self._writable_path(name) is not None
+
+    def _writable_path(self, name: str) -> Optional[str]:
         path = self._name_to_path().get(name)
-        if not path:
-            return False
-        return os.path.dirname(path) == os.path.abspath(self._default_dir)
+        if path and os.path.dirname(path) == os.path.abspath(self._default_dir):
+            return path
+        return None
 
     def load(self, name: str) -> List[str]:
         return m3u.parse_file(self.file_path(name))
@@ -83,10 +91,8 @@ class PlaylistStore(QObject):
         return ok
 
     def delete(self, name: str) -> bool:
-        if not self.is_writable(name):
-            return False
-        path = self.file_path(name)
-        if not os.path.isfile(path):
+        path = self._writable_path(name)
+        if path is None:
             return False
         try:
             os.remove(path)
@@ -98,10 +104,8 @@ class PlaylistStore(QObject):
     def rename(self, old: str, new: str) -> bool:
         if not new or new == old:
             return False
-        if not self.is_writable(old):
-            return False
-        old_path = self.file_path(old)
-        if not os.path.isfile(old_path):
+        old_path = self._writable_path(old)
+        if old_path is None:
             return False
         ext = os.path.splitext(old_path)[1] or ".m3u8"
         new_path = os.path.join(self._default_dir, _safe_filename(new) + ext)

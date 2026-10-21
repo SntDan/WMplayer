@@ -278,7 +278,6 @@ class MainWindow(QMainWindow):
         sep.setFixedWidth(1)
 
         right = QWidget()
-        self.right_panel = right
         rv = QVBoxLayout(right)
         rv.setContentsMargins(0, 0, 0, 0)
         rv.setSpacing(0)
@@ -482,9 +481,7 @@ class MainWindow(QMainWindow):
             self.lyrics_panel,
             self.playlists_panel,
         ):
-            fn = getattr(panel, "retranslate", None)
-            if callable(fn):
-                fn()
+            panel.retranslate()
 
     def _restore_state(self) -> None:
         self._engine.set_volume(int(self._config.get("volume", DEFAULT_VOLUME)))

@@ -97,22 +97,18 @@ class _MpvIpcProcess(QObject):
         request_id = -1
         try:
             with self._write_lock:
-                request_id = self._next_request_id()
+                self._request_id += 1
+                request_id = self._request_id
                 with self._pending_lock:
                     self._pending[request_id] = pending
                 self._write_line({"command": list(command), "request_id": request_id})
-        except Exception:
-            if request_id >= 0:
-                with self._pending_lock:
-                    self._pending.pop(request_id, None)
-            raise
-        try:
             if not pending.event.wait(timeout):
                 raise TimeoutError(f"mpv command timed out: request {request_id}")
             response = pending.response
         finally:
-            with self._pending_lock:
-                self._pending.pop(request_id, None)
+            if request_id >= 0:
+                with self._pending_lock:
+                    self._pending.pop(request_id, None)
         if not isinstance(response, dict):
             return None
         error = response.get("error")
@@ -210,10 +206,6 @@ class _MpvIpcProcess(QObject):
             else:
                 self.event_received.emit(message)
 
-    def _next_request_id(self) -> int:
-        self._request_id += 1
-        return self._request_id
-
     def _write_line(self, payload: Dict[str, Any]) -> None:
         data = (json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8")
         self._pipe.write(data)
@@ -272,15 +264,12 @@ class _WindowsNamedPipe:
                 line = bytes(self._buffer[: newline + 1])
                 del self._buffer[: newline + 1]
                 return line
-            if deadline is not None:
-                while True:
-                    _data, available, _left = win32pipe.PeekNamedPipe(self._handle, 0)
-                    if available > 0:
-                        break
-                    if time.monotonic() >= deadline:
-                        return b""
-                    time.sleep(0.005)
             _data, available, _left = win32pipe.PeekNamedPipe(self._handle, 0)
+            if not available and deadline is not None:
+                if time.monotonic() >= deadline:
+                    return b""
+                time.sleep(0.005)
+                continue
             size = max(1, min(available or 1, 4096))
             _code, data = self._win32file.ReadFile(self._handle, size)
             if not data:
@@ -494,8 +483,7 @@ class AudioEngine(QObject):
             self._ignore_end_until = now + 0.8
             self._last_position_sync = now
             return
-        else:
-            self._playing = False
+        self._playing = False
         self._last_position_sync = time.monotonic()
         self._queue_track_finished()
 

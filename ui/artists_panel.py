@@ -33,7 +33,6 @@ class ArtistsPanel(QWidget):
     def __init__(self, library: Library, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._library = library
-        self._artists_tracks: Dict[str, List[TrackMetadata]] = {}
         self._build_ui()
         self._wire()
         self.refresh()
@@ -85,24 +84,20 @@ class ArtistsPanel(QWidget):
         self.list_artists.itemClicked.connect(self._on_artist_clicked)
 
     def refresh(self) -> None:
-        self._artists_tracks.clear()
+        artists_tracks: Dict[str, List[TrackMetadata]] = {}
         for t in self._library.tracks:
             artist = t.artist.strip() if t.artist else tr("unknown_artist")
-            self._artists_tracks.setdefault(artist, []).append(t)
+            artists_tracks.setdefault(artist, []).append(t)
 
-        for artist in self._artists_tracks:
-            self._artists_tracks[artist].sort(
-                key=lambda t: (t.album or "", t.title or "")
-            )
-
-        artists = sorted(self._artists_tracks)
+        artists = sorted(artists_tracks)
         with suspended_updates(self.list_artists):
             self.list_artists.clear()
             for a in artists:
-                tracks = self._artists_tracks[a]
+                tracks = artists_tracks[a]
+                first = min(tracks, key=lambda t: (t.album or "", t.title or ""))
                 it = QListWidgetItem(a)
                 it.setData(Qt.ItemDataRole.UserRole, a)
-                it.setData(ROLE_THUMB_PATH, thumb_path_for(tracks[0].path))
+                it.setData(ROLE_THUMB_PATH, thumb_path_for(first.path))
                 album_count = len({t.album for t in tracks})
                 it.setData(ROLE_SUBTITLE, tr("albums_count", n=album_count))
                 self.list_artists.addItem(it)

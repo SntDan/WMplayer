@@ -39,26 +39,17 @@ from ui.theme import PRIMARY_BTN_QSS
 class ElidedLabel(QLabel):
     def __init__(self, text: str = "", parent: Optional[QWidget] = None) -> None:
         super().__init__(text, parent)
-        self._text = text
         sp = QSizePolicy(
             QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Preferred
         )
         self.setSizePolicy(sp)
         self.setMinimumWidth(10)
 
-    def setText(self, text: str) -> None:
-        self._text = text
-        super().setText(text)
-        self.update()
-
-    def text(self) -> str:
-        return getattr(self, "_text", super().text())
-
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
         metrics = self.fontMetrics()
         elided = metrics.elidedText(
-            self._text, Qt.TextElideMode.ElideRight, self.width()
+            self.text(), Qt.TextElideMode.ElideRight, self.width()
         )
         painter.drawText(self.rect(), self.alignment(), elided)
 

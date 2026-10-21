@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Optional
 
 from PyQt6.QtCore import (
@@ -14,7 +15,6 @@ from PyQt6.QtCore import (
 from PyQt6.QtGui import (
     QBrush,
     QColor,
-    QFont,
     QImage,
     QPainter,
     QPen,
@@ -24,10 +24,8 @@ from PyQt6.QtGui import (
 try:
     from PyQt6.QtSvg import QSvgRenderer
 
-    _HAS_QTSVG = True
 except ImportError:  # pragma: no cover
     QSvgRenderer = None  # type: ignore[assignment]
-    _HAS_QTSVG = False
 from PyQt6.QtWidgets import QLabel, QPushButton, QSizePolicy, QWidget
 
 from .hr_badge import HR_BADGE_HEIGHT, HR_BADGE_WIDTH, paint_hr_badge
@@ -77,67 +75,46 @@ LUCIDE_FILL: dict[str, str] = {
 }
 
 
-def _draw_lucide_stroke(
+@lru_cache(maxsize=64)
+def _svg_renderer(svg: str) -> QSvgRenderer:
+    return QSvgRenderer(svg.encode("utf-8"))
+
+
+def _draw_lucide_icon(
     painter: QPainter,
     rect: QRectF,
     path_data: str,
     color: QColor,
-    stroke_ratio: float = 2.0 / 24.0,
+    *,
+    stroke_ratio: Optional[float] = None,
 ) -> None:
-    """Draw a Lucide stroke icon."""
-    if not _HAS_QTSVG:
+    """Render static icons without reparsing their SVG on every repaint."""
+    if QSvgRenderer is None:
         return
     side = min(rect.width(), rect.height())
     if side <= 0:
         return
 
-    painter.save()
+    if stroke_ratio is None:
+        attributes = f'fill="{color.name()}" stroke="none"'
+    else:
+        attributes = (
+            f'fill="none" stroke="{color.name()}" '
+            f'stroke-width="{stroke_ratio * 24:.2f}" '
+            'stroke-linecap="round" stroke-linejoin="round"'
+        )
     svg = (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
-        f'fill="none" stroke="{color.name()}" '
-        f'stroke-width="{stroke_ratio * 24:.2f}" '
-        'stroke-linecap="round" stroke-linejoin="round">'
-        f'<path d="{path_data}"/>'
-        "</svg>"
+        f'{attributes}><path d="{path_data}"/></svg>'
     )
-    renderer = QSvgRenderer(svg.encode("utf-8"))
     target = QRectF(
         rect.center().x() - side / 2,
         rect.center().y() - side / 2,
         side,
         side,
     )
-    renderer.render(painter, target)
-    painter.restore()
-
-
-def _draw_lucide_fill(
-    painter: QPainter,
-    rect: QRectF,
-    path_data: str,
-    color: QColor,
-) -> None:
-    """Draw a filled transport icon."""
-    if not _HAS_QTSVG:
-        return
-    side = min(rect.width(), rect.height())
-    if side <= 0:
-        return
     painter.save()
-    svg = (
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
-        f'fill="{color.name()}" stroke="none">'
-        f'<path d="{path_data}"/>'
-        "</svg>"
-    )
-    renderer = QSvgRenderer(svg.encode("utf-8"))
-    target = QRectF(
-        rect.center().x() - side / 2,
-        rect.center().y() - side / 2,
-        side,
-        side,
-    )
-    renderer.render(painter, target)
+    _svg_renderer(svg).render(painter, target)
     painter.restore()
 
 
@@ -201,7 +178,7 @@ class IconButton(QPushButton):
             icon_rect.translate(0, self._icon_y_offset)
         path = LUCIDE_STROKE.get(self._icon_name)
         if path:
-            _draw_lucide_stroke(p, icon_rect, path, col, stroke_ratio=2.2 / 24.0)
+            _draw_lucide_icon(p, icon_rect, path, col, stroke_ratio=2.2 / 24.0)
         p.end()
 
 
@@ -240,7 +217,7 @@ class CircleButton(QPushButton):
         )
         path = LUCIDE_FILL.get(self._icon_name)
         if path:
-            _draw_lucide_fill(p, icon_rect, path, col)
+            _draw_lucide_icon(p, icon_rect, path, col)
         p.end()
 
 
