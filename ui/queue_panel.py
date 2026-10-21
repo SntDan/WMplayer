@@ -49,11 +49,14 @@ class QueuePanel(QWidget):
 
     def _build_ui(self) -> None:
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(20, 16, 20, 16)
+        outer.setContentsMargins(20, 6, 20, 16)
         outer.setSpacing(10)
 
+        header = QVBoxLayout()
+        header.setSpacing(6)
+        outer.addLayout(header)
         self.title_label, self.count_label = add_list_header(
-            outer, tr("queue"), tr("tracks_count", n=0)
+            header, tr("queue"), tr("tracks_count", n=0)
         )
 
         action_row = QHBoxLayout()
@@ -69,7 +72,7 @@ class QueuePanel(QWidget):
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setStyleSheet(_BTN_QSS)
             action_row.addWidget(b)
-        outer.addLayout(action_row)
+        header.addLayout(action_row)
 
         self.list = cover_list()
         self.list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)

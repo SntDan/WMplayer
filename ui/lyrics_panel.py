@@ -28,7 +28,7 @@ from PyQt6.QtWidgets import (
 from core.lrc import Lyrics
 
 from .i18n import tr
-from .theme import Theme
+from .theme import PAGE_TITLE_QSS, Theme
 
 LYRIC_VISUAL_LEAD_MS = 240
 LYRIC_ANIMATE_MAX_LINE_JUMP = 2
@@ -476,8 +476,8 @@ class LyricsPanel(QWidget):
 
     def _build_ui(self) -> None:
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(20, 16, 20, 16)
-        outer.setSpacing(8)
+        outer.setContentsMargins(20, 6, 20, 16)
+        outer.setSpacing(6)
 
         header = QHBoxLayout()
         self.title_label = QLabel(tr("lyrics"))
@@ -485,6 +485,7 @@ class LyricsPanel(QWidget):
         f.setPointSize(15)
         f.setBold(True)
         self.title_label.setFont(f)
+        self.title_label.setStyleSheet(PAGE_TITLE_QSS)
         self.info_label = QLabel("")
         self.info_label.setStyleSheet("color: #9E9E9E;")
         header.addWidget(self.title_label)

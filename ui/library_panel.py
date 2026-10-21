@@ -54,11 +54,14 @@ class LibraryPanel(QWidget):
 
     def _build_ui(self) -> None:
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(20, 16, 20, 16)
+        outer.setContentsMargins(20, 6, 20, 16)
         outer.setSpacing(10)
 
+        header = QVBoxLayout()
+        header.setSpacing(6)
+        outer.addLayout(header)
         self.title_label, self.count_label = add_list_header(
-            outer, tr("library"), tr("tracks_count", n=0)
+            header, tr("library"), tr("tracks_count", n=0)
         )
 
         action_row = QHBoxLayout()
@@ -72,7 +75,7 @@ class LibraryPanel(QWidget):
         self.btn_scan.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_scan.setStyleSheet(_BTN_QSS)
         action_row.addWidget(self.btn_scan)
-        outer.addLayout(action_row)
+        header.addLayout(action_row)
 
         self.progress = QProgressBar()
         self.progress.setVisible(False)

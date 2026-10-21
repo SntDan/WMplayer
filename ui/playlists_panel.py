@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QPainter
 from PyQt6.QtWidgets import (
     QInputDialog,
     QLabel,
     QListWidgetItem,
     QMenu,
     QMessageBox,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -20,6 +22,34 @@ from core.thumbnails import thumb_path_for
 from ui.i18n import tr
 from ui.list_delegates import ROLE_SUBTITLE, ROLE_THUMB_PATHS
 from ui.list_helpers import add_list_header, cover_list, suspended_updates
+
+
+class _DirectoryLabel(QLabel):
+    """Elide the directory within a single search-box-height row."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.setStyleSheet("color: #666;")
+
+    def sizeHint(self) -> QSize:  # noqa: N802
+        metrics = self.fontMetrics()
+        # Match QLineEdit: inner margins (2), theme padding (8), border (2).
+        return QSize(0, max(metrics.height(), 14) + 12)
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802
+        return self.sizeHint()
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        painter = QPainter(self)
+        painter.setPen(self.palette().color(self.foregroundRole()))
+        rect = self.contentsRect()
+        text = self.fontMetrics().elidedText(
+            self.text(), Qt.TextElideMode.ElideRight, rect.width()
+        )
+        painter.drawText(
+            rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, text
+        )
 
 
 class PlaylistsPanel(QWidget):
@@ -36,17 +66,18 @@ class PlaylistsPanel(QWidget):
 
     def _build_ui(self) -> None:
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(20, 16, 20, 16)
+        outer.setContentsMargins(20, 6, 20, 16)
         outer.setSpacing(10)
 
+        header = QVBoxLayout()
+        header.setSpacing(6)
+        outer.addLayout(header)
         self.title_label, self.count_label = add_list_header(
-            outer, tr("playlists"), tr("items_count", n=0)
+            header, tr("playlists"), tr("items_count", n=0)
         )
 
-        self.path_label = QLabel()
-        self.path_label.setStyleSheet("color: #666; font-size: 11px;")
-        self.path_label.setWordWrap(True)
-        outer.addWidget(self.path_label)
+        self.path_label = _DirectoryLabel()
+        header.addWidget(self.path_label)
 
         self.list = cover_list()
         self.list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -61,6 +92,7 @@ class PlaylistsPanel(QWidget):
         self.path_label.setText(
             tr("default_playlist_dir", path=self._store.default_dir)
         )
+        self.path_label.setToolTip(self.path_label.text())
         with suspended_updates(self.list):
             self.list.clear()
             for name, paths in self._store.iter_playlists():

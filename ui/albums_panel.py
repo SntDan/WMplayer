@@ -89,9 +89,10 @@ class AlbumsPanel(QWidget):
 
         self.page_list = QWidget()
         l0 = QVBoxLayout(self.page_list)
-        l0.setContentsMargins(20, 16, 20, 16)
+        l0.setContentsMargins(20, 16 if self._embedded else 6, 20, 16)
         l0.setSpacing(10)
 
+        header = l0
         if self._embedded:
             (
                 self.lbl_artist_cover,
@@ -106,7 +107,10 @@ class AlbumsPanel(QWidget):
             h0.addWidget(self.album_count)
             l0.addLayout(h0)
         else:
-            self.title_label, self.album_count = add_list_header(l0, tr("albums"), "0")
+            header = QVBoxLayout()
+            header.setSpacing(6)
+            l0.addLayout(header)
+            self.title_label, self.album_count = add_list_header(header, tr("albums"), "0")
 
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText(tr("search_albums"))
@@ -115,7 +119,7 @@ class AlbumsPanel(QWidget):
         if self._embedded:
             self.search_box.setVisible(False)
 
-        l0.addWidget(self.search_box)
+        header.addWidget(self.search_box)
 
         self.list_albums = cover_list()
         l0.addWidget(self.list_albums)

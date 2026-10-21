@@ -32,6 +32,9 @@ PRIMARY_BTN_QSS = (
 )
 
 
+PAGE_TITLE_QSS = "font-size: 20px; font-weight: bold;"
+
+
 GLOBAL_QSS = """
 QWidget {
     background-color: #000000;

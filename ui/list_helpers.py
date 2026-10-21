@@ -25,6 +25,7 @@ from ui.list_delegates import (
     ROLE_THUMB_PATH,
     CoverRowDelegate,
 )
+from ui.theme import PAGE_TITLE_QSS
 
 
 def add_list_header(
@@ -37,6 +38,7 @@ def add_list_header(
     font.setPointSize(15)
     font.setBold(True)
     title_label.setFont(font)
+    title_label.setStyleSheet(PAGE_TITLE_QSS)
     count_label.setStyleSheet("color: #9E9E9E;")
     row.addWidget(title_label)
     row.addStretch(1)

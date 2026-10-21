@@ -45,15 +45,18 @@ class ArtistsPanel(QWidget):
 
         self.page_list = QWidget()
         l0 = QVBoxLayout(self.page_list)
-        l0.setContentsMargins(20, 16, 20, 16)
+        l0.setContentsMargins(20, 6, 20, 16)
         l0.setSpacing(10)
 
-        self.title_label, self.artist_count = add_list_header(l0, tr("artists"), "0")
+        header = QVBoxLayout()
+        header.setSpacing(6)
+        l0.addLayout(header)
+        self.title_label, self.artist_count = add_list_header(header, tr("artists"), "0")
 
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText(tr("search_artists"))
         self.search_box.setClearButtonEnabled(True)
-        l0.addWidget(self.search_box)
+        header.addWidget(self.search_box)
 
         self.list_artists = cover_list()
         l0.addWidget(self.list_artists)
