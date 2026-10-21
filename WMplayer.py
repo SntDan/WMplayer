@@ -12,14 +12,10 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 
-def _set_windows_app_id() -> None:
+def main() -> int:
     from core.windows_identity import configure_windows_identity
 
     configure_windows_identity()
-
-
-def main() -> int:
-    _set_windows_app_id()
 
     from PyQt6.QtGui import QIcon
     from PyQt6.QtWidgets import QApplication

@@ -929,11 +929,10 @@ class MainWindow(QMainWindow):
         dlg.volume_changed.connect(self._engine.set_volume)
         if dlg.exec():
             dlg.apply_to_config()
-            self._engine.set_volume(int(self._config.get("volume", DEFAULT_VOLUME)))
-            set_language(str(self._config.get("language", "en")))
             self._retranslate_ui()
             self._library.set_folders(self._config.library_folders_effective())
             self._store.set_locations(self._config.playlist_locations_effective())
             self._library.scan_async()
         else:
             self._engine.set_volume(original_volume)
+        dlg.deleteLater()

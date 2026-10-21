@@ -5,7 +5,8 @@ from __future__ import annotations
 import os
 from typing import List, Optional
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import QRectF, Qt, pyqtSignal
+from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -22,6 +23,8 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSlider,
+    QStyle,
+    QStyleOptionTabWidgetFrame,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -42,16 +45,98 @@ from ui.i18n import language, set_language, tr
 from ui.theme import BTN_QSS as _BTN_QSS
 from ui.theme import PRIMARY_BTN_QSS as _PRIMARY_BTN_QSS
 
-_LOCKED_DEFAULT_QSS = (
-    "QLabel{background:#0a0a0a; border:1px solid #222; border-radius:3px;"
-    "padding:6px 10px; color:#777;}"
-)
+_CORNER_RADIUS = 4
+_TAB_GAP = 2
+
+_SETTINGS_QSS = f"""
+QTabWidget, QTabBar, QLabel#settingsAbout {{
+    background: transparent;
+}}
+QTabWidget::pane {{
+    background: transparent;
+    border: none;
+    padding: 5px;
+}}
+QTabBar::tab {{
+    background: transparent;
+    border: none;
+    padding: 5px 11px;
+    margin-right: {_TAB_GAP}px;
+    margin-bottom: {_TAB_GAP}px;
+}}
+QLabel[defaultPath="true"] {{
+    background: #0a0a0a;
+    border: 1px solid #222;
+    border-radius: {_CORNER_RADIUS}px;
+    padding: 6px 10px;
+    color: #777;
+}}
+QListWidget {{
+    background: #0a0a0a;
+}}
+QListWidget, QComboBox, QComboBox QAbstractItemView {{
+    border: 1px solid #333;
+    border-radius: {_CORNER_RADIUS}px;
+}}
+QCheckBox::indicator {{
+    border-radius: {_CORNER_RADIUS}px;
+}}
+"""
+
+
+class _SettingsTabs(QTabWidget):
+    """Draw the selected tab and pane as one outline with curved joins."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.currentChanged.connect(lambda _index: self.update())
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        if self.currentIndex() < 0:
+            return
+        option = QStyleOptionTabWidgetFrame()
+        self.initStyleOption(option)
+        pane = QRectF(self.style().subElementRect(
+            QStyle.SubElement.SE_TabWidgetTabPane, option, self
+        )).adjusted(0.5, 0.5, -0.5, -0.5)
+        bar = self.tabBar()
+        tab = QRectF(bar.tabRect(self.currentIndex()))
+        tab.translate(bar.x(), bar.y())
+        # Keep the stroke inside the widget and exclude the QSS tab spacing.
+        tab.adjust(0.5, 0.5, -_TAB_GAP - 0.5, -_TAB_GAP - 0.5)
+        radius = float(_CORNER_RADIUS)
+        path = QPainterPath()
+        path.moveTo(tab.left() + radius, tab.top())
+        path.lineTo(tab.right() - radius, tab.top())
+        path.quadTo(tab.right(), tab.top(), tab.right(), tab.top() + radius)
+        path.lineTo(tab.right(), pane.top() - radius)
+        path.quadTo(tab.right(), pane.top(), tab.right() + radius, pane.top())
+        path.lineTo(pane.right() - radius, pane.top())
+        path.quadTo(pane.right(), pane.top(), pane.right(), pane.top() + radius)
+        path.lineTo(pane.right(), pane.bottom() - radius)
+        path.quadTo(pane.right(), pane.bottom(), pane.right() - radius, pane.bottom())
+        path.lineTo(pane.left() + radius, pane.bottom())
+        path.quadTo(pane.left(), pane.bottom(), pane.left(), pane.bottom() - radius)
+        if tab.left() > pane.left() + 2 * radius:
+            path.lineTo(pane.left(), pane.top() + radius)
+            path.quadTo(pane.left(), pane.top(), pane.left() + radius, pane.top())
+            path.lineTo(tab.left() - radius, pane.top())
+            path.quadTo(tab.left(), pane.top(), tab.left(), pane.top() - radius)
+        path.lineTo(tab.left(), tab.top() + radius)
+        path.quadTo(tab.left(), tab.top(), tab.left() + radius, tab.top())
+        path.closeSubpath()
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(QPen(QColor("#333"), 1.0))
+        painter.setBrush(QColor("#000"))
+        painter.drawPath(path)
 
 
 def _make_default_label(prefix: str, path: str) -> QLabel:
     """Create a disabled default-path label."""
     lbl = QLabel(f"{prefix} {path}")
-    lbl.setStyleSheet(_LOCKED_DEFAULT_QSS)
+    lbl.setProperty("defaultPath", True)
     lbl.setToolTip(tr("default_dir_tooltip"))
     lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
     return lbl
@@ -66,16 +151,18 @@ class SettingsDialog(QDialog):
         set_language(str(self._config.get("language", language())))
         self.setWindowTitle(tr("settings"))
         self.setMinimumSize(620, 500)
+        self.setStyleSheet(_SETTINGS_QSS)
 
         layout = QVBoxLayout(self)
 
-        tabs = QTabWidget()
+        tabs = _SettingsTabs()
         tabs.addTab(self._build_library_tab(), tr("library"))
         tabs.addTab(self._build_playlists_tab(), tr("playlists"))
         tabs.addTab(self._build_general_tab(), tr("general"))
         layout.addWidget(tabs, 1)
 
         about = QLabel(tr("about"))
+        about.setObjectName("settingsAbout")
         about.setWordWrap(True)
 
         btns = QDialogButtonBox(
@@ -87,6 +174,7 @@ class SettingsDialog(QDialog):
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setStyleSheet(_PRIMARY_BTN_QSS)
         footer = QHBoxLayout()
+        footer.setContentsMargins(0, 0, 8, 0)
         footer.addWidget(about, 1)
         footer.addWidget(btns, 0, Qt.AlignmentFlag.AlignVCenter)
         layout.addLayout(footer)
@@ -100,9 +188,6 @@ class SettingsDialog(QDialog):
 
         v.addWidget(QLabel(tr("other_library_dirs")))
         self.lst_folders = QListWidget()
-        self.lst_folders.setStyleSheet(
-            "QListWidget{border:1px solid #333; background:#0a0a0a;}"
-        )
         for f in self._config.get("library_folders", []) or []:
             self.lst_folders.addItem(f)
         v.addWidget(self.lst_folders, 1)
@@ -139,9 +224,6 @@ class SettingsDialog(QDialog):
 
         v.addWidget(QLabel(tr("other_playlist_sources")))
         self.lst_playlist_locs = QListWidget()
-        self.lst_playlist_locs.setStyleSheet(
-            "QListWidget{border:1px solid #333; background:#0a0a0a;}"
-        )
         for loc in self._config.get("playlist_locations", []) or []:
             self._add_playlist_location_item(loc)
         v.addWidget(self.lst_playlist_locs, 1)
