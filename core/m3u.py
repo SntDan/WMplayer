@@ -6,6 +6,22 @@ import os
 from typing import List
 
 
+def list_files(source: str) -> List[str]:
+    """List M3U files in a source, or return a single playlist file."""
+    source = os.path.abspath(source)
+    if os.path.isdir(source):
+        try:
+            paths = [os.path.join(source, name) for name in sorted(os.listdir(source))]
+        except OSError:
+            return []
+    else:
+        paths = [source]
+    return [
+        path for path in paths
+        if path.lower().endswith((".m3u", ".m3u8")) and os.path.isfile(path)
+    ]
+
+
 def parse(content: str, base_dir: str = "") -> List[str]:
     """Parse text into a data object."""
     paths: List[str] = []

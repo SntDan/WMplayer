@@ -783,11 +783,46 @@ class MainWindow(QMainWindow):
             self.player_panel.set_lyrics_available(False)
 
     def _on_save_queue_as_playlist(self, name: str) -> None:
-        if not name:
+        self._save_playlist(name, self._playlist.paths, "readonly_save_msg")
+
+    def _confirm_internal_playlist(
+        self, name: str, message_key: str = "readonly_edit_msg"
+    ) -> bool:
+        if self._store.is_writable(name) or name not in self._store.list_names():
+            return True
+        return QMessageBox.question(
+            self,
+            tr("copy_playlist_title"),
+            tr(message_key, name=name),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        ) == QMessageBox.StandardButton.Yes
+
+    def _save_playlist(
+        self, name: str, paths: List[str], message_key: str = "readonly_edit_msg"
+    ) -> None:
+        if not name or not self._confirm_internal_playlist(name, message_key):
             return
-        ok = self._store.save(name, self._playlist.paths)
-        if not ok:
+        source = (
+            self._store.file_path(name)
+            if name in self._store.list_names() and not self._store.is_writable(name)
+            else None
+        )
+        if not self._store.save(name, paths):
             QMessageBox.warning(self, tr("save_failed_title"), tr("save_failed_msg"))
+        elif source is not None:
+            self._remove_external_playlist_source(source)
+
+    def _remove_external_playlist_source(self, source: str) -> None:
+        """Keep only the internal copy after a confirmed external playlist edit."""
+        source_key = os.path.normcase(os.path.abspath(source))
+        locations = [
+            path for path in self._config.playlist_locations_effective()
+            if os.path.normcase(os.path.abspath(path)) != source_key
+        ]
+        self._config.set("playlist_locations", locations)
+        self._config.save()
+        self._store.set_locations(locations)
 
     def _tracks_from_paths(self, paths):
         """Resolve tracks from paths with cache fallback."""
@@ -849,7 +884,7 @@ class MainWindow(QMainWindow):
             name = self._prompt_new_playlist_name()
             if name is None:
                 return
-            self._store.save(name, paths)
+            self._save_playlist(name, paths, "readonly_save_msg")
             return
         new_label = f"<{tr('new_playlist')}>"
         choice, ok = QInputDialog.getItem(
@@ -865,7 +900,7 @@ class MainWindow(QMainWindow):
         if choice == new_label:
             name = self._prompt_new_playlist_name()
             if name is not None:
-                self._store.save(name, paths)
+                self._save_playlist(name, paths, "readonly_save_msg")
             return
         self._append_paths_to_playlist(choice, paths)
 
@@ -882,7 +917,7 @@ class MainWindow(QMainWindow):
             if path not in seen:
                 merged.append(path)
                 seen.add(path)
-        self._store.save(name, merged)
+        self._save_playlist(name, merged)
 
     def _rescan_library(self) -> None:
         self._library.set_folders(self._config.library_folders_effective())
@@ -901,12 +936,18 @@ class MainWindow(QMainWindow):
             self._play_index(0)
 
     def _on_rename_playlist(self, old: str, new: str) -> None:
-        if not self._store.is_writable(old):
-            QMessageBox.information(
-                self, tr("readonly_rename_title"), tr("readonly_rename_msg")
-            )
+        if not new or old == new:
             return
-        if not self._store.rename(old, new):
+        if not self._store.is_writable(old):
+            if not self._confirm_internal_playlist(old):
+                return
+            source = self._store.file_path(old)
+            ok = self._store.copy_to_default(old, new)
+            if ok:
+                self._remove_external_playlist_source(source)
+        else:
+            ok = self._store.rename(old, new)
+        if not ok:
             QMessageBox.warning(
                 self, tr("rename_failed_title"), tr("rename_failed_msg")
             )

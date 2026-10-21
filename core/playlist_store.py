@@ -42,7 +42,7 @@ class PlaylistStore(QObject):
         if os.path.isdir(self._default_dir):
             sources = [self._default_dir, *sources]
         for source in sources:
-            for path in _playlist_files(source):
+            for path in m3u.list_files(source):
                 entry = _playlist_entry(path, seen_names, seen_paths)
                 if entry is not None:
                     entries.append(entry)
@@ -101,6 +101,18 @@ class PlaylistStore(QObject):
         except Exception:
             return False
 
+    def copy_to_default(self, name: str, new_name: str) -> bool:
+        """Copy a source playlist under a new name without replacing a playlist."""
+        source = self._name_to_path().get(name)
+        if source is None or not new_name:
+            return False
+        safe = _safe_filename(new_name)
+        target = os.path.join(self._default_dir, safe + ".m3u8")
+        if safe in self.list_names() or os.path.exists(target):
+            return False
+        # Resolve relative tracks before moving the playlist to another folder.
+        return self.save(new_name, m3u.parse_file(source))
+
     def rename(self, old: str, new: str) -> bool:
         if not new or new == old:
             return False
@@ -125,17 +137,6 @@ _INVALID_FN_CHARS = '<>:"/\\|?*'
 def _safe_filename(name: str) -> str:
     s = "".join("_" if c in _INVALID_FN_CHARS else c for c in name).strip()
     return s or "untitled"
-
-
-def _playlist_files(source: str) -> List[str]:
-    if os.path.isfile(source):
-        return [source]
-    if not os.path.isdir(source):
-        return []
-    try:
-        return [os.path.join(source, name) for name in sorted(os.listdir(source))]
-    except OSError:
-        return []
 
 
 def _playlist_entry(

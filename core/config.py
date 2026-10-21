@@ -7,6 +7,8 @@ import os
 import sys
 from typing import Any, Dict, List
 
+from core import m3u
+
 
 def program_root() -> str:
     """Return the project root directory."""
@@ -117,16 +119,17 @@ class Config:
         return result
 
     def playlist_locations_effective(self) -> List[str]:
-        """Return user-added playlist sources."""
+        """Return external playlist files, expanding legacy folder sources."""
         result: List[str] = []
-        default_abs = os.path.abspath(default_playlists_dir())
+        seen: set[str] = set()
+        default_abs = os.path.normcase(os.path.abspath(default_playlists_dir()))
         for loc in self.get("playlist_locations", []) or []:
             if not loc:
                 continue
-            ap = os.path.abspath(loc)
-            if ap == default_abs:
-                continue
-            if os.path.isdir(ap) or os.path.isfile(ap):
-                if ap not in result:
-                    result.append(ap)
+            for path in m3u.list_files(loc):
+                key = os.path.normcase(path)
+                if os.path.normcase(os.path.dirname(path)) == default_abs or key in seen:
+                    continue
+                seen.add(key)
+                result.append(path)
         return result
