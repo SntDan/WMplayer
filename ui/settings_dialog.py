@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import List, Optional
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
 
 from core.config import (
     DEFAULT_CONFIG,
+    DEFAULT_VOLUME,
     LIBRARY_CACHE_PATH,
     QUEUE_CACHE_PATH,
     QUEUE_ORIGINAL_CACHE_PATH,
@@ -57,6 +58,8 @@ def _make_default_label(prefix: str, path: str) -> QLabel:
 
 
 class SettingsDialog(QDialog):
+    volume_changed = pyqtSignal(int)
+
     def __init__(self, config: Config, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._config = config
@@ -74,7 +77,6 @@ class SettingsDialog(QDialog):
 
         about = QLabel(tr("about"))
         about.setWordWrap(True)
-        layout.addWidget(about)
 
         btns = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -84,7 +86,10 @@ class SettingsDialog(QDialog):
         for b in btns.buttons():
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setStyleSheet(_PRIMARY_BTN_QSS)
-        layout.addWidget(btns)
+        footer = QHBoxLayout()
+        footer.addWidget(about, 1)
+        footer.addWidget(btns, 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addLayout(footer)
 
     def _build_library_tab(self) -> QWidget:
         w = QWidget()
@@ -202,11 +207,12 @@ class SettingsDialog(QDialog):
 
         self.slider_vol = QSlider(Qt.Orientation.Horizontal)
         self.slider_vol.setRange(0, 100)
-        self.slider_vol.setValue(int(self._config.get("volume", 80)))
+        self.slider_vol.setValue(int(self._config.get("volume", DEFAULT_VOLUME)))
         self.lbl_vol = QLabel(f"{self.slider_vol.value()}%")
         self.slider_vol.valueChanged.connect(
             lambda val: self.lbl_vol.setText(f"{val}%")
         )
+        self.slider_vol.valueChanged.connect(self.volume_changed.emit)
         wrap = QWidget()
         h = QHBoxLayout(wrap)
         h.setContentsMargins(0, 0, 0, 0)

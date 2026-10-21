@@ -20,6 +20,8 @@ from typing import Any, Dict, Optional
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
+from .config import DEFAULT_VOLUME
+
 
 class _PendingRequest:
     def __init__(self) -> None:
@@ -310,7 +312,7 @@ class AudioEngine(QObject):
         self._gapless_handoff_path: Optional[str] = None
         self._duration_ms = 0
         self._position_ms = 0
-        self._volume = 80
+        self._volume = DEFAULT_VOLUME
         self._playing = False
         self._loading_replacement = False
         self._stopping = False

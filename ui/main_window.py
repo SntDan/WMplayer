@@ -34,6 +34,7 @@ from core import lrc as lrc_mod
 from core import m3u
 from core.audio_engine import AudioEngine
 from core.config import (
+    DEFAULT_VOLUME,
     LIBRARY_CACHE_PATH,
     QUEUE_CACHE_PATH,
     QUEUE_ORIGINAL_CACHE_PATH,
@@ -486,7 +487,7 @@ class MainWindow(QMainWindow):
                 fn()
 
     def _restore_state(self) -> None:
-        self._engine.set_volume(int(self._config.get("volume", 80)))
+        self._engine.set_volume(int(self._config.get("volume", DEFAULT_VOLUME)))
         self._restore_playback_mode()
         self._restore_queue()
 
@@ -922,12 +923,17 @@ class MainWindow(QMainWindow):
         self._store.delete(name)
 
     def _on_settings(self) -> None:
+        original_volume = self._engine.get_volume()
         dlg = SettingsDialog(self._config, self)
+        dlg.slider_vol.setValue(original_volume)
+        dlg.volume_changed.connect(self._engine.set_volume)
         if dlg.exec():
             dlg.apply_to_config()
-            self._engine.set_volume(int(self._config.get("volume", 80)))
+            self._engine.set_volume(int(self._config.get("volume", DEFAULT_VOLUME)))
             set_language(str(self._config.get("language", "en")))
             self._retranslate_ui()
             self._library.set_folders(self._config.library_folders_effective())
             self._store.set_locations(self._config.playlist_locations_effective())
             self._library.scan_async()
+        else:
+            self._engine.set_volume(original_volume)

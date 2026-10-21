@@ -42,8 +42,10 @@ QUEUE_CACHE_PATH = os.path.join(CONFIG_DIR, "queue.m3u8")
 QUEUE_ORIGINAL_CACHE_PATH = os.path.join(CONFIG_DIR, "queue_original.m3u8")
 
 
+DEFAULT_VOLUME = 100
+
 DEFAULT_CONFIG: Dict[str, Any] = {
-    "volume": 80,
+    "volume": DEFAULT_VOLUME,
     "play_mode": "sequential",
     "last_position_ms": 0,
     "last_track_path": "",
