@@ -46,7 +46,7 @@ if errorlevel 1 (
     echo [ERROR] The selected Python must be version 3.10 or newer.
     goto failed
 )
-"%WMPLAYER_PYTHON%" %WMPLAYER_PYTHON_ARGS% -c "import PyInstaller, PyQt6.QtWidgets, mutagen, PIL, win32pipe"
+"%WMPLAYER_PYTHON%" %WMPLAYER_PYTHON_ARGS% -c "import PyInstaller, PyQt6.QtWidgets, mutagen, PIL, win32pipe; from winrt.windows.media.interop import get_for_window; from winrt.windows.storage.streams import DataWriter; from winrt.windows.foundation import Uri"
 if errorlevel 1 (
     echo [ERROR] Build dependencies are missing or cannot be loaded.
     echo Install them in the selected Python environment:

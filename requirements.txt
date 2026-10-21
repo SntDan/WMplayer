@@ -2,5 +2,9 @@
 PyQt6==6.10.2
 PyQt6-Qt6==6.10.2
 pywin32>=306; platform_system == "Windows"
+winrt-Windows.Foundation>=3.1,<4; platform_system == "Windows"
+winrt-Windows.Media>=3.1,<4; platform_system == "Windows"
+winrt-Windows.Media.Interop>=3.1,<4; platform_system == "Windows"
+winrt-Windows.Storage.Streams>=3.1,<4; platform_system == "Windows"
 mutagen>=1.47.0
 Pillow>=10.0.0

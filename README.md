@@ -48,6 +48,7 @@ It uses mpv for playback, reads metadata with mutagen, and supports common lossl
 | Python | >= 3.10 |
 | PyQt6 / Qt runtime | 6.10.2 |
 | pywin32 | >= 306 on Windows |
+| PyWinRT (Foundation, Media, Media.Interop, Storage.Streams) | >= 3.1, < 4 on Windows |
 | mutagen | >= 1.47 |
 | Pillow | >= 10.0 |
 | mpv executable | Required on `PATH` or bundled with the app |
@@ -55,6 +56,8 @@ It uses mpv for playback, reads metadata with mutagen, and supports common lossl
 ## Usage
 
 On Windows, double-click `install-mpv.bat` in the WMplayer folder first. It downloads mpv from GitHub, installs it into `%LOCALAPPDATA%\Programs\mpv`, and adds that folder to the front of the user `PATH` so WMplayer and other apps can use the same mpv.
+
+WMplayer publishes its own Windows media controls with the app name, track information, and artwork. On startup it creates or updates a per-user Start menu shortcut with its application ID and keeps a persistent icon in `%LOCALAPPDATA%\WMplayer`; no administrator access is needed. Install the Windows dependencies from `requirements.txt` to enable this integration. If unavailable, playback falls back to mpv's media controls.
 
 You can also run it from PowerShell:
 
@@ -194,6 +197,7 @@ WMplayer 是一个用 Python 和 PyQt6 写的本地桌面音乐播放器。它�
 | Python | >= 3.10 |
 | PyQt6 / Qt 运行库 | 6.10.2 |
 | pywin32 | Windows 上 >= 306 |
+| PyWinRT（Foundation、Media、Media.Interop、Storage.Streams）| Windows 上 >= 3.1、< 4 |
 | mutagen | >= 1.47 |
 | Pillow | >= 10.0 |
 | mpv executable | 需要位于 `PATH` 中，或随程序一起打包 |
@@ -201,6 +205,8 @@ WMplayer 是一个用 Python 和 PyQt6 写的本地桌面音乐播放器。它�
 ## 使用方法
 
 Windows 用户先双击项目根目录里的 `install-mpv.bat`。它会自动从 GitHub 下载 mpv，安装到 `%LOCALAPPDATA%\Programs\mpv`，并把这个文件夹加到用户级 `PATH` 最前面；这样 WMplayer 和其他软件都能共用同一个 mpv，不需要管理员权限。
+
+WMplayer 自行提供 Windows 系统媒体控件，显示应用名称、歌曲信息和封面。启动时会创建或更新当前用户的开始菜单快捷方式及应用 ID，并将持久图标保存到 `%LOCALAPPDATA%\WMplayer`，无需管理员权限。请安装 `requirements.txt` 中的 Windows 依赖以启用此功能；依赖不可用时会回退到 mpv 的媒体控件。
 
 也可以在 PowerShell 里这样运行：
 

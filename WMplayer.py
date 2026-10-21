@@ -13,16 +13,9 @@ if _HERE not in sys.path:
 
 
 def _set_windows_app_id() -> None:
-    if sys.platform != "win32":
-        return
-    try:
-        import ctypes
+    from core.windows_identity import configure_windows_identity
 
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-            "WMplayer.WMplayer"
-        )
-    except Exception:
-        pass
+    configure_windows_identity()
 
 
 def main() -> int:

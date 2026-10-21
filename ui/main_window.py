@@ -42,6 +42,7 @@ from core.config import (
 )
 from core.library import Library
 from core.metadata import read_metadata
+from core.media_controls import MediaControls
 from core.playlist import Playlist, PlayMode, RepeatMode
 from core.playlist_store import PlaylistStore
 
@@ -240,7 +241,8 @@ class MainWindow(QMainWindow):
         self._last_media_command: tuple[int, float] = (-1, 0.0)
         self._media_key_hook = _MediaKeyHook(self)
 
-        self._engine = AudioEngine(self)
+        self._media_controls = MediaControls(self)
+        self._engine = AudioEngine(self, media_controls=not self._media_controls.available)
         self._playlist = Playlist(self)
         self._library = Library(LIBRARY_CACHE_PATH, self)
         self._library.set_folders(self._config.library_folders_effective())
@@ -305,6 +307,11 @@ class MainWindow(QMainWindow):
 
     def _wire(self) -> None:
         self._media_key_hook.command.connect(self._handle_media_app_command)
+        self._media_controls.command.connect(self._handle_media_app_command)
+        self._media_controls.seek_requested.connect(self._engine.seek)
+        self._engine.state_changed.connect(self._media_controls.set_state)
+        self._engine.duration_changed.connect(self._media_controls.set_duration)
+        self._engine.position_changed.connect(self._media_controls.set_position)
 
         self.segmented.changed.connect(self._switch_view)
 
@@ -574,6 +581,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, e):  # noqa: N802
         if not self._config.factory_reset_pending:
             self._save_state()
+        self._media_controls.close()
         try:
             self._media_key_hook.close()
         except Exception:
@@ -660,6 +668,7 @@ class MainWindow(QMainWindow):
         if cached_cover and not track.cover:
             track.cover = cached_cover
         self.player_panel.set_track(track, index, len(self._playlist))
+        self._media_controls.set_track(track)
         if self._engine.load(track.path) and self._autoplay_after_load:
             self._engine.play()
         self._fetch_cover_async(track.path)
@@ -746,6 +755,7 @@ class MainWindow(QMainWindow):
         if cover:
             cur.cover = cover
             self.player_panel.cover.set_cover(cover)
+            self._media_controls.set_cover(cover)
 
     def _on_remove_track(self, index: int) -> None:
         was_current = index == self._playlist.current_index

@@ -32,7 +32,7 @@ class _MpvIpcProcess(QObject):
 
     event_received = pyqtSignal(dict)
 
-    def __init__(self) -> None:
+    def __init__(self, *, media_controls: bool = True) -> None:
         super().__init__()
         exe = self._find_mpv_executable()
         if not exe:
@@ -65,7 +65,7 @@ class _MpvIpcProcess(QObject):
         if sys.platform == "win32":
             args.append("--ao=wasapi")
             args.append("--priority=abovenormal")
-            args.append("--media-controls=yes")
+            args.append(f"--media-controls={'yes' if media_controls else 'no'}")
 
         if sys.platform == "win32" and hasattr(
             subprocess, "ABOVE_NORMAL_PRIORITY_CLASS"
@@ -302,7 +302,7 @@ class AudioEngine(QObject):
     backend_track_changed = pyqtSignal(str)
     error_occurred = pyqtSignal(str)
 
-    def __init__(self, parent: Optional[QObject] = None) -> None:
+    def __init__(self, parent: Optional[QObject] = None, *, media_controls: bool = True) -> None:
         super().__init__(parent)
         self._player: Optional[_MpvIpcProcess] = None
         self._current_path: Optional[str] = None
@@ -321,7 +321,7 @@ class AudioEngine(QObject):
         self._last_position_sync = 0.0
 
         try:
-            self._player = _MpvIpcProcess()
+            self._player = _MpvIpcProcess(media_controls=media_controls)
             self._player.add_event_handler(self._on_mpv_event)
             self._player.command("set_property", "volume", self._volume)
             self._player.command("observe_property", 1, "path")
