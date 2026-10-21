@@ -6,7 +6,6 @@ from contextlib import contextmanager
 from typing import Callable, Iterator
 
 from PyQt6.QtCore import QObject, Qt, QTimer
-from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -19,6 +18,7 @@ from PyQt6.QtWidgets import (
 
 from core.metadata import TrackMetadata
 from core.thumbnails import thumb_path_for
+from ui.fading_list import FadingListWidget
 from ui.list_delegates import (
     ROLE_IS_HR,
     ROLE_SUBTITLE,
@@ -34,10 +34,6 @@ def add_list_header(
     """Add the common list title and right-aligned count."""
     row = QHBoxLayout()
     title_label, count_label = QLabel(title), QLabel(count)
-    font = QFont()
-    font.setPointSize(15)
-    font.setBold(True)
-    title_label.setFont(font)
     title_label.setStyleSheet(PAGE_TITLE_QSS)
     count_label.setStyleSheet("color: #9E9E9E;")
     row.addWidget(title_label)
@@ -49,7 +45,7 @@ def add_list_header(
 
 def cover_list(*, uniform_sizes: bool = True) -> QListWidget:
     """Build the shared cover list without imposing panel-specific selection."""
-    widget = QListWidget()
+    widget = FadingListWidget()
     widget.setTextElideMode(Qt.TextElideMode.ElideRight)
     widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
     widget.setUniformItemSizes(uniform_sizes)

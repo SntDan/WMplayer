@@ -481,10 +481,6 @@ class LyricsPanel(QWidget):
 
         header = QHBoxLayout()
         self.title_label = QLabel(tr("lyrics"))
-        f = QFont()
-        f.setPointSize(15)
-        f.setBold(True)
-        self.title_label.setFont(f)
         self.title_label.setStyleSheet(PAGE_TITLE_QSS)
         self.info_label = QLabel("")
         self.info_label.setStyleSheet("color: #9E9E9E;")

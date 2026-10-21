@@ -54,6 +54,7 @@ class CoverRowDelegate(QStyledItemDelegate):
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         rect = option.rect
+        painter.setClipRect(rect, Qt.ClipOperation.IntersectClip)
 
         if bool(index.data(ROLE_SECTION_HEADER)):
             self._paint_section_header(
@@ -157,7 +158,8 @@ class CoverRowDelegate(QStyledItemDelegate):
 
         painter.setPen(_SEPARATOR_COLOR)
         y = rect.bottom()
-        painter.drawLine(rect.left(), y, rect.right(), y)
+        # Keep the divider clear of the cover, which occupies the full row height.
+        painter.drawLine(text_x, y, rect.right(), y)
 
         painter.restore()
 
