@@ -16,7 +16,7 @@ from PyQt6.QtCore import (
     pyqtProperty,
     pyqtSignal,
 )
-from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter
+from PyQt6.QtGui import QColor, QFont, QFontMetrics, QLinearGradient, QPainter
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -40,6 +40,7 @@ LYRIC_VERTICAL_MARGIN = 10
 LYRIC_FOCUS_HEIGHT_RATIO = 0.47
 LYRIC_SCROLLBAR_HIDE_MS = 1000
 LYRIC_FOLLOW_RESUME_MS = 5000
+LYRIC_EDGE_FADE_PX = 24
 
 
 class _LyricsCanvas(QWidget):
@@ -78,17 +79,6 @@ class _LyricsCanvas(QWidget):
 
         self._manual_scroll = False
         self._scrollbar = QScrollBar(Qt.Orientation.Vertical, self)
-        self._scrollbar.setStyleSheet("""
-            QScrollBar:vertical { background: transparent; width: 8px; margin: 0; }
-            QScrollBar::handle:vertical {
-                background: rgba(255, 255, 255, 100); min-height: 24px;
-                border-radius: 4px;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: transparent;
-            }
-        """)
         self._scrollbar.hide()
         self._scrollbar.installEventFilter(self)
         self._scrollbar.valueChanged.connect(self._scrollbar_moved)
@@ -280,7 +270,11 @@ class _LyricsCanvas(QWidget):
 
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)
-        self._scrollbar.setGeometry(self.width() - 12, 4, 8, max(0, self.height() - 8))
+        scrollbar_width = self._scrollbar.sizeHint().width()
+        self._scrollbar.setGeometry(
+            self.width() - 1 - scrollbar_width, 4,
+            scrollbar_width, max(0, self.height() - 8),
+        )
         self._anim.stop()
         if self._synced and not self._manual_scroll:
             self._set_scroll(self._target_scroll())
@@ -397,7 +391,26 @@ class _LyricsCanvas(QWidget):
             p.drawText(rect, flags, text)
 
             y_top += block_h
+        self._paint_edge_fades(p)
         p.end()
+
+    def _paint_edge_fades(self, painter: QPainter) -> None:
+        depth = min(LYRIC_EDGE_FADE_PX, self.height() // 2)
+        if depth < 2:
+            return
+        max_scroll = self._max_scroll()
+        for top, active in (
+            (True, self._scroll > 0),
+            (False, self._scroll < max_scroll),
+        ):
+            if not active:
+                continue
+            y = 0 if top else self.height() - depth
+            fade = QLinearGradient(0, y + 0.5, 0, y + depth - 0.5)
+            opaque, clear = QColor(0, 0, 0), QColor(0, 0, 0, 0)
+            fade.setColorAt(0, opaque if top else clear)
+            fade.setColorAt(1, clear if top else opaque)
+            painter.fillRect(QRect(0, y, self.width(), depth), fade)
 
     def mousePressEvent(self, e):  # noqa: N802
         if self._lyrics is None:

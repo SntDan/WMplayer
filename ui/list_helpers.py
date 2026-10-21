@@ -46,6 +46,7 @@ def add_list_header(
 def cover_list(*, uniform_sizes: bool = True) -> QListWidget:
     """Build the shared cover list without imposing panel-specific selection."""
     widget = FadingListWidget()
+    widget.setStyleSheet("QListWidget { padding-left: 1px; padding-right: 1px; }")
     widget.setTextElideMode(Qt.TextElideMode.ElideRight)
     widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
     widget.setUniformItemSizes(uniform_sizes)

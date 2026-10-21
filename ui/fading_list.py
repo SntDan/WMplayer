@@ -9,10 +9,10 @@ from PyQt6.QtWidgets import QListWidget, QStyle, QStyleOptionViewItem, QWidget
 
 class _ListEdge(QWidget):
     # Fade over scrolled rows without moving their initial layout positions.
-    TOP_DEPTH = 36
-    BOTTOM_DEPTH = 24
-    TOP_OUTSIDE = 12
-    BOTTOM_OUTSIDE = 12
+    TOP_DEPTH = 16
+    BOTTOM_DEPTH = 16
+    TOP_OUTSIDE = 6
+    BOTTOM_OUTSIDE = 6
 
     def __init__(self, view: FadingListWidget, *, top: bool) -> None:
         super().__init__()
