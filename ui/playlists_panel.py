@@ -73,7 +73,7 @@ class PlaylistsPanel(QWidget):
         header.setSpacing(6)
         outer.addLayout(header)
         self.title_label, self.count_label = add_list_header(
-            header, tr("playlists"), tr("items_count", n=0)
+            header, tr("playlists"), tr("playlists_count", n=0)
         )
 
         self.path_label = _DirectoryLabel()
@@ -101,7 +101,7 @@ class PlaylistsPanel(QWidget):
                 it.setData(ROLE_SUBTITLE, tr("tracks_count", n=len(paths)))
                 it.setData(ROLE_THUMB_PATHS, [thumb_path_for(p) for p in paths[:4]])
                 self.list.addItem(it)
-        self.count_label.setText(tr("items_count", n=self.list.count()))
+        self.count_label.setText(tr("playlists_count", n=self.list.count()))
 
     def _on_double_click(self, item: QListWidgetItem) -> None:
         name = item.data(Qt.ItemDataRole.UserRole)

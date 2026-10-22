@@ -7,16 +7,18 @@ import time
 from typing import List, Optional
 
 from PyQt6.QtCore import (
+    QEasingCurve,
     QEvent,
     QObject,
     QRunnable,
     QSize,
     Qt,
     QThreadPool,
+    QVariantAnimation,
     qWarning,
     pyqtSignal,
 )
-from PyQt6.QtGui import QGuiApplication, QKeySequence, QShortcut
+from PyQt6.QtGui import QColor, QGuiApplication, QKeySequence, QPainter, QShortcut
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QFrame,
@@ -26,6 +28,8 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QStackedWidget,
+    QStyle,
+    QStyleOptionButton,
     QVBoxLayout,
     QWidget,
 )
@@ -160,6 +164,73 @@ class _MediaKeyHook(QObject):
             self._callback = None
 
 
+_TAB_ANIMATION_MS = 70
+
+
+class _SegmentButton(QPushButton):
+    """Fade the label and underline in place, keeping native button behavior."""
+
+    def __init__(self, text: str, parent: QWidget) -> None:
+        super().__init__(text, parent)
+        self._label_brightness = 153.0
+        self._underline_opacity = 0.0
+        self._start_brightness = self._target_brightness = self._label_brightness
+        self._start_opacity = self._target_opacity = self._underline_opacity
+        self._hovered = False
+        self._animation = QVariantAnimation(self)
+        self._animation.setDuration(_TAB_ANIMATION_MS)
+        self._animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._animation.setStartValue(0.0)
+        self._animation.setEndValue(1.0)
+        self._animation.valueChanged.connect(self._set_progress)
+        self.toggled.connect(self._animate_state)
+
+    def _set_progress(self, progress: float) -> None:
+        self._label_brightness = self._start_brightness + (
+            self._target_brightness - self._start_brightness
+        ) * progress
+        self._underline_opacity = self._start_opacity + (
+            self._target_opacity - self._start_opacity
+        ) * progress
+        self.update()
+
+    def _animate_state(self) -> None:
+        self._animation.stop()
+        self._start_brightness = self._label_brightness
+        self._start_opacity = self._underline_opacity
+        self._target_brightness = 255.0 if self.isChecked() or self._hovered else 153.0
+        self._target_opacity = 1.0 if self.isChecked() else 0.0
+        if not self.isVisible():
+            self._set_progress(1.0)
+            return
+        self._animation.start()
+
+    def enterEvent(self, event) -> None:  # noqa: N802
+        super().enterEvent(event)
+        self._hovered = True
+        self._animate_state()
+
+    def leaveEvent(self, event) -> None:  # noqa: N802
+        super().leaveEvent(event)
+        self._hovered = False
+        self._animate_state()
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        super().paintEvent(event)
+        option = QStyleOptionButton()
+        self.initStyleOption(option)
+        rect = self.style().subElementRect(
+            QStyle.SubElement.SE_PushButtonContents, option, self
+        )
+        painter = QPainter(self)
+        brightness = round(self._label_brightness)
+        painter.setPen(QColor(brightness, brightness, brightness))
+        painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, self.text())
+        painter.setOpacity(self._underline_opacity)
+        # Match the 6px side margins, 4px bottom margin and 2px line.
+        painter.fillRect(6, self.height() - 6, self.width() - 12, 2, QColor("#E63946"))
+
+
 class _Segmented(QWidget):
     """Right-side tab bar."""
 
@@ -168,7 +239,7 @@ class _Segmented(QWidget):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         h = QHBoxLayout(self)
-        h.setContentsMargins(12, 14, 12, 0)
+        h.setContentsMargins(12, 4, 12, 0)
         h.setSpacing(0)
 
         self._group = QButtonGroup(self)
@@ -182,15 +253,19 @@ class _Segmented(QWidget):
             "playlists",
         ]
         for i, key in enumerate(self._label_keys):
-            b = QPushButton(tr(key))
+            b = _SegmentButton(tr(key), self)
             b.setCheckable(True)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setStyleSheet(_SEG_QSS)
             self._group.addButton(b, i)
             h.addWidget(b)
         h.addStretch(1)
-        self._group.idClicked.connect(self.changed.emit)
+        self._group.idClicked.connect(self._on_clicked)
         self.set_index(3)
+
+    def _on_clicked(self, idx: int) -> None:
+        self.set_index(idx)
+        self.changed.emit(idx)
 
     def set_index(self, idx: int) -> None:
         btn = self._group.button(idx)
@@ -207,16 +282,12 @@ class _Segmented(QWidget):
 _SEG_QSS = """
 QPushButton {
     background: transparent;
-    color: #999;
+    color: transparent;
     border: none;
     border-bottom: 2px solid transparent;
-    padding: 8px 11px;
+    margin: 0px 6px 4px 6px;
+    padding: 8px 5px 4px 5px;
     font-size: 13px;
-}
-QPushButton:hover { color: #FFF; }
-QPushButton:checked {
-    color: #FFF;
-    border-bottom: 2px solid #E63946;
 }
 """
 
