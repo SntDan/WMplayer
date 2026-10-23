@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from core.library import Library
+from core.library import Library, album_track_sort_key
 from core.metadata import TrackMetadata
 from core.thumbnails import thumb_path_for
 from ui.i18n import tr
@@ -69,6 +69,8 @@ class AlbumsPanel(QWidget):
         self._library = library
         self._embedded = embedded
         self._filter_artist: Optional[str] = None
+        self._current_album: Optional[str] = None
+        self._current_artist: Optional[str] = None
         self._albums_tracks: Dict[str, List[TrackMetadata]] = {}
         self._build_ui()
         self._wire()
@@ -199,6 +201,8 @@ class AlbumsPanel(QWidget):
             self.lbl_embedded_subtitle.setText(tr("albums_count", n=len(albums)))
 
         self._apply_filter(self.search_box.text())
+        if self.stack.currentIndex() == 1 and self._current_album is not None:
+            self.show_album(self._current_album, self._current_artist)
 
     def _populate_album_list(self, albums: List[str]) -> None:
         with suspended_updates(self.list_albums):
@@ -220,10 +224,17 @@ class AlbumsPanel(QWidget):
     def _apply_filter(self, text: str) -> None:
         filter_items_by_text(self.list_albums, text)
 
-    def show_album(self, album: str) -> None:
+    def show_album(self, album: str, artist: Optional[str] = None) -> None:
+        album = album.strip() or tr("unknown_album")
+        if artist is not None:
+            artist = artist.strip() or tr("unknown_artist")
         self._current_album = album
+        self._current_artist = artist
         self.lbl_album_title.setText(album)
         tracks = self._albums_tracks.get(album, [])
+        if artist is not None:
+            tracks = [track for track in tracks
+                      if ((track.artist or "").strip() or tr("unknown_artist")) == artist]
         artist_name = (
             tracks[0].artist if tracks and tracks[0].artist else tr("unknown_artist")
         )
@@ -256,14 +267,7 @@ class AlbumsPanel(QWidget):
             self.play_paths_shuffled.emit(paths)
 
     def _on_track_clicked(self, item: QListWidgetItem) -> None:
-        path = item.data(Qt.ItemDataRole.UserRole)
-        album = getattr(self, "_current_album", "")
-        tracks = self._albums_tracks.get(album, [])
-        try:
-            track_idx = next(i for i, t in enumerate(tracks) if t.path == path)
-        except StopIteration:
-            track_idx = 0
-        self._play_from_album(album, track_idx)
+        self._play_from_album(self.list_tracks.row(item))
 
     def _on_track_context_menu(self, pos) -> None:
         item = self.list_tracks.itemAt(pos)
@@ -284,19 +288,16 @@ class AlbumsPanel(QWidget):
             self.enqueue_paths.emit(paths)
 
     def _on_play_all(self) -> None:
-        album = getattr(self, "_current_album", "")
-        if album in self._albums_tracks:
-            self._play_from_album(album, 0, play_all=True)
+        self._play_from_album(0, play_all=True)
 
     def _play_from_album(
-        self, album: str, track_index: int, *, play_all: bool = False
+        self, track_index: int, *, play_all: bool = False
     ) -> None:
         """Play within the current album."""
-        tracks = self._albums_tracks.get(album, [])
-        if not tracks:
-            return
-        paths = [t.path for t in tracks]
-        self.play_album_requested.emit(paths, track_index, play_all)
+        paths = [self.list_tracks.item(i).data(Qt.ItemDataRole.UserRole)
+                 for i in range(self.list_tracks.count())]
+        if 0 <= track_index < len(paths):
+            self.play_album_requested.emit(paths, track_index, play_all)
 
     def retranslate(self) -> None:
         if not self._embedded and hasattr(self, "title_label"):
@@ -318,19 +319,14 @@ def _group_tracks_by_album(
     unknown_artist = tr("unknown_artist")
     unknown_album = tr("unknown_album")
     for track in tracks:
-        artist = track.artist.strip() if track.artist else unknown_artist
+        artist = (track.artist or "").strip() or unknown_artist
         if artist_filter and artist != artist_filter:
             continue
-        album = track.album.strip() if track.album else unknown_album
+        album = (track.album or "").strip() or unknown_album
         albums.setdefault(album, []).append(track)
 
     for album_tracks in albums.values():
-        album_tracks.sort(
-            key=lambda track: (
-                track.track_number if track.track_number > 0 else 9999,
-                track.title or "",
-            )
-        )
+        album_tracks.sort(key=album_track_sort_key)
     return albums
 
 

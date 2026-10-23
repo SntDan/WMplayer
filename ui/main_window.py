@@ -430,14 +430,15 @@ class MainWindow(QMainWindow):
             self._on_save_queue_as_playlist
         )
 
+        self.library_panel.play_track_requested.connect(self._play_library_track_now)
         self.library_panel.play_paths_now.connect(self._play_paths_now)
         self.library_panel.enqueue_paths.connect(self._enqueue_paths)
         self.library_panel.play_next_paths.connect(self._play_next_paths)
         self.library_panel.add_paths_to_playlist.connect(
             self._add_paths_to_some_playlist
         )
-        self.library_panel.open_artist_requested.connect(self._open_artist_from_search)
-        self.library_panel.open_album_requested.connect(self._open_album_from_search)
+        self.library_panel.open_artist_requested.connect(self._open_artist)
+        self.library_panel.open_album_requested.connect(self._open_album)
         self.library_panel.rescan_requested.connect(self._rescan_library)
 
         self.albums_panel.play_album_requested.connect(self._play_album_now)
@@ -517,22 +518,20 @@ class MainWindow(QMainWindow):
     def _on_player_artist_double_clicked(self) -> None:
         track = self._playlist.current
         if track and track.artist:
-            self._switch_view(self.VIEW_ARTISTS)
-            self.artists_panel.show_artist(track.artist)
+            self._open_artist(track.artist)
 
     def _on_player_album_double_clicked(self) -> None:
         track = self._playlist.current
         if track and track.album:
-            self._switch_view(self.VIEW_ALBUMS)
-            self.albums_panel.show_album(track.album)
+            self._open_album(track.album, track.artist)
 
-    def _open_artist_from_search(self, artist: str) -> None:
+    def _open_artist(self, artist: str) -> None:
         self._switch_view(self.VIEW_ARTISTS)
         self.artists_panel.show_artist(artist)
 
-    def _open_album_from_search(self, album: str) -> None:
+    def _open_album(self, album: str, artist: Optional[str] = None) -> None:
         self._switch_view(self.VIEW_ALBUMS)
-        self.albums_panel.show_album(album)
+        self.albums_panel.show_album(album, artist)
 
     def _switch_view(self, idx: int) -> None:
         self.segmented.set_index(idx)
@@ -635,11 +634,12 @@ class MainWindow(QMainWindow):
             "searches": {
                 key: editor.text() for key, (editor, _) in self._view_searches().items()
             },
-            "album": getattr(self.albums_panel, "_current_album", None)
+            "album": self.albums_panel._current_album
             if self.albums_panel.stack.currentIndex() == 1 else None,
+            "album_artist": self.albums_panel._current_artist,
             "artist": subpanel._filter_artist
             if self.artists_panel.stack.currentIndex() == 1 else None,
-            "artist_album": getattr(subpanel, "_current_album", None)
+            "artist_album": subpanel._current_album
             if subpanel.stack.currentIndex() == 1 else None,
             "scrolls": {
                 key: widget.verticalScrollBar().value()
@@ -671,7 +671,8 @@ class MainWindow(QMainWindow):
                     panel._apply_filter(text)
         album = state.get("album")
         if isinstance(album, str) and album in self.albums_panel._albums_tracks:
-            self.albums_panel.show_album(album)
+            album_artist = state.get("album_artist")
+            self.albums_panel.show_album(album, album_artist if isinstance(album_artist, str) else None)
         artist = state.get("artist")
         if isinstance(artist, str) and any(
             self.artists_panel.list_artists.item(i).data(Qt.ItemDataRole.UserRole) == artist
@@ -997,6 +998,17 @@ class MainWindow(QMainWindow):
                 except Exception:
                     pass
         return tracks
+
+    def _play_library_track_now(self, path: str) -> None:
+        track = self._library.find_by_path(path)
+        if track is None:
+            return
+        paths = [item.path for item in self._library.album_tracks(track)]
+        try:
+            index = paths.index(path)
+        except ValueError:
+            return
+        self._play_album_now(paths, index)
 
     def _play_paths_now(self, paths: List[str], start_index: int = 0) -> None:
         if not paths:

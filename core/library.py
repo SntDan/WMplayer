@@ -12,6 +12,10 @@ from core.metadata import TrackMetadata, is_supported, read_metadata
 from core.thumbnails import ensure_thumb, thumb_exists
 
 
+def album_track_sort_key(track: TrackMetadata) -> tuple:
+    return track.track_number if track.track_number > 0 else 9999, track.title or ""
+
+
 class _ScanSignals(QObject):
     progress = pyqtSignal(int, int)  # done, total
     finished = pyqtSignal(list, dict)  # tracks and their observed modification times
@@ -168,6 +172,17 @@ class Library(QObject):
         if self._path_map is None:
             self._path_map = {t.path: t for t in self._tracks}
         return self._path_map.get(path)
+
+    def album_tracks(self, track: TrackMetadata) -> List[TrackMetadata]:
+        """Return the complete album for a library song in track order."""
+        album = (track.album or "").strip()
+        artist = (track.artist or "").strip()
+        return sorted(
+            (item for item in self._display_tracks
+             if (item.album or "").strip() == album
+             and (item.artist or "").strip() == artist),
+            key=album_track_sort_key,
+        )
 
     def _rebuild_display(self) -> None:
         """Build the deduplicated library view."""

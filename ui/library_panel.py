@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from core.library import Library
+from core.library import Library, album_track_sort_key
 from core.thumbnails import thumb_path_for
 from ui.i18n import tr
 from ui.list_delegates import (
@@ -37,12 +37,13 @@ from ui.theme import BTN_QSS as _BTN_QSS
 
 
 class LibraryPanel(QWidget):
+    play_track_requested = pyqtSignal(str)
     play_paths_now = pyqtSignal(list, int)
     enqueue_paths = pyqtSignal(list)
     play_next_paths = pyqtSignal(list)
     add_paths_to_playlist = pyqtSignal(list)
     open_artist_requested = pyqtSignal(str)
-    open_album_requested = pyqtSignal(str)
+    open_album_requested = pyqtSignal(str, str)
     rescan_requested = pyqtSignal()
 
     def __init__(self, library: Library, parent: Optional[QWidget] = None) -> None:
@@ -105,7 +106,7 @@ class LibraryPanel(QWidget):
         self.list.customContextMenuRequested.connect(self._on_context_menu)
 
     _ROLE_RESULT_KIND = Qt.ItemDataRole.UserRole + 10
-    _ROLE_RESULT_PATHS = Qt.ItemDataRole.UserRole + 11
+    _ROLE_ALBUM_ARTIST = Qt.ItemDataRole.UserRole + 11
 
     def refresh(self) -> None:
         self.count_label.setText(tr("tracks_count", n=len(self._library.tracks)))
@@ -142,20 +143,20 @@ class LibraryPanel(QWidget):
                 artist,
                 tr("album_track_count", albums=album_count, tracks=len(tracks)),
                 tracks[0].path if tracks else "",
-                [track.path for track in tracks],
+                data=artist,
             )
 
     def _add_album_rows(self, rows) -> None:
         self._add_header(tr("album_header", n=len(rows)))
         for album, artist, tracks in rows:
-            self._add_result_item(
+            item = self._add_result_item(
                 "album",
                 album,
                 tr("artist_track_count", artist=artist, tracks=len(tracks)),
                 tracks[0].path if tracks else "",
-                [track.path for track in tracks],
                 data=album,
             )
+            item.setData(self._ROLE_ALBUM_ARTIST, artist)
 
     def _add_song_rows(self, tracks) -> None:
         for t in tracks:
@@ -164,7 +165,7 @@ class LibraryPanel(QWidget):
                 t.title or "",
                 f"{t.artist or ''} - {t.album or ''}".strip(" -"),
                 t.path,
-                [t.path],
+                data=t.path,
                 is_hr=t.is_high_res(),
             )
 
@@ -180,22 +181,13 @@ class LibraryPanel(QWidget):
         title: str,
         subtitle: str,
         thumb_source_path: str,
-        paths: List[str],
         *,
-        data: Optional[str] = None,
+        data: str,
         is_hr: bool = False,
-    ) -> None:
+    ) -> QListWidgetItem:
         item = QListWidgetItem(title)
-        item.setData(
-            Qt.ItemDataRole.UserRole,
-            data
-            if data is not None
-            else title
-            if kind != "song"
-            else (paths[0] if paths else ""),
-        )
+        item.setData(Qt.ItemDataRole.UserRole, data)
         item.setData(self._ROLE_RESULT_KIND, kind)
-        item.setData(self._ROLE_RESULT_PATHS, paths)
         item.setData(
             ROLE_THUMB_PATH,
             thumb_path_for(thumb_source_path) if thumb_source_path else "",
@@ -203,6 +195,7 @@ class LibraryPanel(QWidget):
         item.setData(ROLE_SUBTITLE, subtitle)
         item.setData(ROLE_IS_HR, is_hr)
         self.list.addItem(item)
+        return item
 
     def _on_scan_started(self) -> None:
         self.progress.setVisible(True)
@@ -243,7 +236,7 @@ class LibraryPanel(QWidget):
         if kind == "album":
             album = item.data(Qt.ItemDataRole.UserRole)
             if album:
-                self.open_album_requested.emit(album)
+                self.open_album_requested.emit(album, item.data(self._ROLE_ALBUM_ARTIST))
             return
         if kind != "song":
             return
@@ -251,26 +244,7 @@ class LibraryPanel(QWidget):
         if not path:
             return
 
-        visible_paths, start_index = self._visible_song_paths(path)
-        if visible_paths:
-            self.play_paths_now.emit(visible_paths, start_index)
-        else:
-            self.play_paths_now.emit([path], 0)
-
-    def _visible_song_paths(self, selected_path: str) -> tuple[List[str], int]:
-        paths: List[str] = []
-        selected_index = 0
-        for index in range(self.list.count()):
-            item = self.list.item(index)
-            if item.data(self._ROLE_RESULT_KIND) != "song":
-                continue
-            path = item.data(Qt.ItemDataRole.UserRole)
-            if not path:
-                continue
-            if path == selected_path:
-                selected_index = len(paths)
-            paths.append(path)
-        return paths, selected_index
+        self.play_track_requested.emit(path)
 
     def _on_context_menu(self, pos) -> None:
         item = self.list.itemAt(pos)
@@ -339,7 +313,7 @@ def _group_search_results(tracks, query: str):
         if query in artist.lower()
     ]
     album_rows = [
-        (album, artist, sorted(items, key=_album_track_sort_key))
+        (album, artist, sorted(items, key=album_track_sort_key))
         for (album, artist), items in albums.items()
         if query in album.lower() or query in artist.lower()
     ]
@@ -356,22 +330,15 @@ def _group_search_results(tracks, query: str):
     return artist_rows, album_rows, song_rows
 
 
-def _track_number_or_last(track) -> int:
-    return track.track_number if track.track_number > 0 else 9999
-
-
 def _artist_track_sort_key(track) -> tuple:
-    return track.album or "", _track_number_or_last(track), track.title or ""
-
-
-def _album_track_sort_key(track) -> tuple:
-    return _track_number_or_last(track), track.title or ""
+    return track.album or "", *album_track_sort_key(track)
 
 
 def _song_search_sort_key(track) -> tuple:
+    number, title = album_track_sort_key(track)
     return (
         (track.artist or "").lower(),
         (track.album or "").lower(),
-        _track_number_or_last(track),
-        (track.title or "").lower(),
+        number,
+        title.lower(),
     )
