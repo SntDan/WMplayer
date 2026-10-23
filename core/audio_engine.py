@@ -301,6 +301,9 @@ class AudioEngine(QObject):
         self._gapless_handoff_path: Optional[str] = None
         self._duration_ms = 0
         self._position_ms = 0
+        self._file_loaded = False
+        self._pending_seek_ms: Optional[int] = None
+        self._play_after_seek = False
         self._volume = DEFAULT_VOLUME
         self._playing = False
         self._loading_replacement = False
@@ -342,10 +345,11 @@ class AudioEngine(QObject):
         ):
             self._preloaded_path = None
             self._gapless_handoff_path = None
-            self._reset_track_timing(path, ignore_end_seconds=0.8)
+            self._reset_track_timing(path, ignore_end_seconds=0.8, file_loaded=True)
             return True
 
         try:
+            self._stopping = False
             self._loading_replacement = True
             self._gapless_handoff_path = None
             self._preloaded_path = None
@@ -385,6 +389,9 @@ class AudioEngine(QObject):
     def play(self) -> None:
         if self._player is None or self._current_path is None:
             return
+        if self._pending_seek_ms is not None:
+            self._play_after_seek = True
+            return
         try:
             self._stopping = False
             self._player.command("set_property", "pause", False, timeout=0.8)
@@ -395,6 +402,7 @@ class AudioEngine(QObject):
             self.error_occurred.emit(f"Playback failed: {exc}")
 
     def pause(self) -> None:
+        self._play_after_seek = False
         if self._player is None:
             return
         try:
@@ -407,6 +415,8 @@ class AudioEngine(QObject):
             pass
 
     def stop(self) -> None:
+        self._pending_seek_ms = None
+        self._play_after_seek = False
         if self._player is None:
             return
         try:
@@ -422,7 +432,13 @@ class AudioEngine(QObject):
             pass
 
     def seek(self, position_ms: int) -> None:
-        if self._player is None or self._duration_ms <= 0:
+        if self._player is None or self._current_path is None:
+            return
+        position_ms = max(0, int(position_ms))
+        if not self._file_loaded or self._duration_ms <= 0:
+            self._pending_seek_ms = position_ms
+            self._position_ms = position_ms
+            self.position_changed.emit(position_ms)
             return
         position_ms = max(0, min(int(position_ms), self._duration_ms))
         try:
@@ -430,10 +446,16 @@ class AudioEngine(QObject):
                 "seek", position_ms / 1000.0, "absolute", "exact", timeout=0.8
             )
             self._position_ms = position_ms
+            self._pending_seek_ms = None
             self._last_position_sync = time.monotonic()
             self.position_changed.emit(position_ms)
-        except Exception:
-            pass
+            if self._play_after_seek:
+                self._play_after_seek = False
+                self.play()
+        except Exception as exc:
+            self._pending_seek_ms = None
+            self._play_after_seek = False
+            self.error_occurred.emit(f"Playback seek failed: {exc}")
 
     def set_volume(self, volume: int) -> None:
         self._volume = max(0, min(100, int(volume)))
@@ -448,7 +470,7 @@ class AudioEngine(QObject):
         return self._volume
 
     def is_playing(self) -> bool:
-        return self._playing
+        return self._playing or self._play_after_seek
 
     def get_position(self) -> int:
         if self._playing:
@@ -465,12 +487,31 @@ class AudioEngine(QObject):
             self._player.close()
 
     def _on_mpv_event(self, event: Dict[str, Any]) -> None:
+        if self._released or self._stopping:
+            return
+        if event.get("event") == "file-loaded":
+            self._file_loaded = True
+            if self._pending_seek_ms is not None:
+                self._update_duration(self._get_property("duration"))
+                self._apply_pending_seek()
+            return
         if event.get("event") == "property-change":
             self._on_mpv_property_change(event)
             return
         if event.get("event") != "end-file":
             return
-        if self._released or self._stopping or self._loading_replacement:
+        if event.get("reason") == "error":
+            self._pending_seek_ms = None
+            self._play_after_seek = False
+            self._playing = False
+            self._file_loaded = False
+            self._position_ms = 0
+            self.position_changed.emit(0)
+            self.state_changed.emit("stopped")
+            message = event.get("file_error", "unknown error")
+            self.error_occurred.emit(f"Playback failed: {message}")
+            return
+        if self._loading_replacement:
             return
         now = time.monotonic()
         if now < self._ignore_end_until:
@@ -509,11 +550,24 @@ class AudioEngine(QObject):
             duration_ms = int(float(value) * 1000)
         except (TypeError, ValueError):
             return
-        if duration_ms > 0 and abs(duration_ms - self._duration_ms) > 250:
+        if duration_ms > 0 and (
+            self._duration_ms == 0 or abs(duration_ms - self._duration_ms) > 250
+        ):
             self._duration_ms = duration_ms
             self.duration_changed.emit(duration_ms)
+        self._apply_pending_seek()
+
+    def _apply_pending_seek(self) -> None:
+        if (
+            self._file_loaded
+            and self._duration_ms > 0
+            and self._pending_seek_ms is not None
+        ):
+            self.seek(self._pending_seek_ms)
 
     def _update_position(self, value: Any) -> None:
+        if self._pending_seek_ms is not None:
+            return
         try:
             position_ms = max(0, int(float(value) * 1000))
         except (TypeError, ValueError):
@@ -542,7 +596,7 @@ class AudioEngine(QObject):
             return
         self._gapless_handoff_path = self._preloaded_path
         self._preloaded_path = None
-        self._reset_track_timing(path, ignore_end_seconds=0.8)
+        self._reset_track_timing(path, ignore_end_seconds=0.8, file_loaded=True)
         self.backend_track_changed.emit(path)
 
     def _reset_track_timing(
@@ -550,11 +604,15 @@ class AudioEngine(QObject):
         path: str,
         *,
         ignore_end_seconds: float = 0.0,
+        file_loaded: bool = False,
     ) -> None:
         now = time.monotonic()
         self._current_path = path
         self._duration_ms = 0
         self._position_ms = 0
+        self._file_loaded = file_loaded
+        self._pending_seek_ms = None
+        self._play_after_seek = False
         self._finish_fallback_triggered = False
         self._ignore_end_until = now + ignore_end_seconds if ignore_end_seconds else 0.0
         self._last_position_sync = now

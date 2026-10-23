@@ -63,7 +63,7 @@ _STRINGS = {
         "choose_library_root": "Choose Library Root",
         "choose_playlist_file": "Choose Playlist File",
         "volume": "Volume",
-        "auto_resume": "Resume last playback position on startup",
+        "auto_resume": "Resume last playback position and state on startup",
         "factory_reset": "Factory Reset...",
         "factory_reset_title": "Factory Reset",
         "factory_reset_confirm": (
@@ -161,7 +161,7 @@ _STRINGS = {
         "choose_library_root": "选择曲库根目录",
         "choose_playlist_file": "选择歌单文件",
         "volume": "音量",
-        "auto_resume": "启动时恢复上次播放进度",
+        "auto_resume": "启动时恢复上次播放进度和播放状态",
         "factory_reset": "恢复出厂设置...",
         "factory_reset_title": "恢复出厂设置",
         "factory_reset_confirm": "将清除所有缓存(曲库索引、播放队列)并恢复默认设置，然后自动关闭程序。\n此操作不可撤销，是否继续？",

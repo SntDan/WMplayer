@@ -10,7 +10,7 @@ htmlcov/
 
 # Tests
 /tests/*
-!/tests/test_playback_queue.py
+!/tests/test_session_restore.py
 /test/
 
 # Local development and generated builds
