@@ -6,7 +6,6 @@ import ctypes
 import logging
 import os
 from pathlib import Path
-import subprocess
 import sys
 
 APP_ID = "WMplayer.WMplayer"
@@ -15,13 +14,16 @@ APP_ID = "WMplayer.WMplayer"
 def configure_windows_identity() -> None:
     if sys.platform != "win32":
         return
+    frozen = getattr(sys, "frozen", False)
     try:
         set_app_id = ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID
         set_app_id.argtypes = [ctypes.c_wchar_p]
         set_app_id.restype = ctypes.c_long
-        if set_app_id(APP_ID) < 0:
+        app_id = APP_ID if frozen else APP_ID + ".Development"
+        if set_app_id(app_id) < 0:
             raise OSError("Could not set WMplayer's Windows application ID")
-        _register_shortcut()
+        if frozen:
+            _register_shortcut()
     except Exception:
         logging.getLogger(__name__).warning(
             "Could not register WMplayer's Windows identity", exc_info=True
@@ -49,15 +51,7 @@ def _register_shortcut() -> None:
     programs = shell.SHGetFolderPath(0, shellcon.CSIDL_PROGRAMS, None, 0)
     shortcut = Path(programs) / "WMplayer.lnk"
     target = Path(sys.executable).resolve()
-    arguments = ""
     working_dir = target.parent
-    if not getattr(sys, "frozen", False):
-        pythonw = target.with_name("pythonw.exe")
-        if pythonw.exists():
-            target = pythonw
-        arguments = subprocess.list2cmdline([str(root / "WMplayer.py")])
-        working_dir = root
-
     link = pythoncom.CoCreateInstance(
         shell.CLSID_ShellLink, None, pythoncom.CLSCTX_INPROC_SERVER,
         shell.IID_IShellLink,
@@ -68,14 +62,14 @@ def _register_shortcut() -> None:
         persist.Load(str(shortcut), storagecon.STGM_READWRITE)
         if (
             link.GetPath(0)[0] == str(target)
-            and link.GetArguments() == arguments
+            and link.GetArguments() == ""
             and link.GetWorkingDirectory() == str(working_dir)
             and link.GetIconLocation() == (str(icon_path), 0)
             and store.GetValue(pscon.PKEY_AppUserModel_ID).GetValue() == APP_ID
         ):
             return
     link.SetPath(str(target))
-    link.SetArguments(arguments)
+    link.SetArguments("")
     link.SetWorkingDirectory(str(working_dir))
     link.SetDescription("WMplayer")
     link.SetIconLocation(str(icon_path), 0)

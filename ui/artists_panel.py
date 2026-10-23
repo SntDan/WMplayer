@@ -24,7 +24,7 @@ from ui.list_helpers import (
 
 
 class ArtistsPanel(QWidget):
-    play_paths_sequential = pyqtSignal(list, int)
+    play_album_requested = pyqtSignal(list, int, bool)
     play_paths_shuffled = pyqtSignal(list)
     enqueue_paths = pyqtSignal(list)
     play_next_paths = pyqtSignal(list)
@@ -65,9 +65,7 @@ class ArtistsPanel(QWidget):
         from .albums_panel import AlbumsPanel
 
         self.albums_subpanel = AlbumsPanel(library=self._library, embedded=True)
-        self.albums_subpanel.play_paths_sequential.connect(
-            self.play_paths_sequential.emit
-        )
+        self.albums_subpanel.play_album_requested.connect(self.play_album_requested.emit)
         self.albums_subpanel.play_paths_shuffled.connect(self.play_paths_shuffled.emit)
         self.albums_subpanel.enqueue_paths.connect(self.enqueue_paths.emit)
         self.albums_subpanel.play_next_paths.connect(self.play_next_paths.emit)

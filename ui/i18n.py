@@ -63,7 +63,12 @@ _STRINGS = {
         "choose_library_root": "Choose Library Root",
         "choose_playlist_file": "Choose Playlist File",
         "volume": "Volume",
-        "auto_resume": "Restore last playback position on startup (paused)",
+        "auto_resume": "Restore last playback position on startup",
+        "album_continuation": "Album in order",
+        "album_continuation_hint": (
+            "Click an album song to play from there to the album's end, then resume "
+            "the original queue."
+        ),
         "factory_reset": "Factory Reset...",
         "factory_reset_title": "Factory Reset",
         "factory_reset_confirm": (
@@ -161,7 +166,9 @@ _STRINGS = {
         "choose_library_root": "选择曲库根目录",
         "choose_playlist_file": "选择歌单文件",
         "volume": "音量",
-        "auto_resume": "启动时恢复上次播放进度（保持暂停）",
+        "auto_resume": "启动时恢复上次播放进度",
+        "album_continuation": "专辑顺播",
+        "album_continuation_hint": "点击专辑歌曲，从该曲顺播至专辑末尾，再接回原队列。",
         "factory_reset": "恢复出厂设置...",
         "factory_reset_title": "恢复出厂设置",
         "factory_reset_confirm": "将清除所有缓存(曲库索引、播放队列)并恢复默认设置，然后自动关闭程序。\n此操作不可撤销，是否继续？",

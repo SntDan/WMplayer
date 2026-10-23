@@ -43,13 +43,6 @@ QWidget {
     font-size: 13px;
 }
 
-QToolTip {
-    background-color: #1F1F1F;
-    color: #FFFFFF;
-    border: 1px solid #333333;
-    padding: 4px 8px;
-}
-
 QListWidget {
     background-color: #000000;
     border: none;

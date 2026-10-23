@@ -20,7 +20,7 @@ It uses mpv for playback, reads metadata with mutagen, and supports common lossl
 - Search results grouped by artist, album, and song
 - M3U/M3U8 playlist loading and saving
 - Sequential play, shuffle play, repeat-all, and repeat-one modes
-- Album playback limited to the selected album
+- Optional album continuation: play an album in order, then resume the existing queue without changing its shuffle order
 - Artist shuffle playback from the artist detail page
 - Cover thumbnails for fast scrolling
 - Async cover preloading to reduce cover flicker during track changes
@@ -57,7 +57,7 @@ It uses mpv for playback, reads metadata with mutagen, and supports common lossl
 
 On Windows, double-click `install-mpv.bat` in the WMplayer folder first. It downloads mpv from GitHub, installs it into `%LOCALAPPDATA%\Programs\mpv`, and adds that folder to the front of the user `PATH` so WMplayer and other apps can use the same mpv.
 
-WMplayer publishes its own Windows media controls with the app name, track information, and artwork. On startup it creates or updates a per-user Start menu shortcut with its application ID and keeps a persistent icon in `%LOCALAPPDATA%\WMplayer`; no administrator access is needed. Install the Windows dependencies from `requirements.txt` to enable this integration. If unavailable, playback falls back to mpv's media controls.
+WMplayer publishes its own Windows media controls with the app name, track information, and artwork. The packaged app creates or updates a per-user Start menu shortcut pointing to its executable and keeps a persistent icon in `%LOCALAPPDATA%\WMplayer`; no administrator access is needed. Source runs use a separate development identity and do not change the shortcut. Install the Windows dependencies from `requirements.txt` to enable this integration. If unavailable, playback falls back to mpv's media controls.
 
 You can also run it from PowerShell:
 
@@ -169,7 +169,7 @@ WMplayer 是一个用 Python 和 PyQt6 写的本地桌面音乐播放器。它�
 - 搜索结果按歌手、专辑、歌曲分组显示
 - 支持读取和保存 M3U/M3U8 歌单
 - 支持顺序播放、随机播放、列表循环和单曲循环
-- 从专辑页播放时，队列会限制在当前专辑内
+- 默认开启「专辑顺播」：点击专辑歌曲后顺播至专辑末尾，再接回原队列，保留随机顺序；关闭时只插入所点歌曲
 - 歌手详情页支持随机播放该歌手全部歌曲
 - 使用封面缩略图提升长列表滚动性能
 - 提前读取封面，减少切歌时的封面闪烁

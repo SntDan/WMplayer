@@ -319,8 +319,15 @@ class SettingsDialog(QDialog):
         form.addRow(tr("volume"), wrap)
 
         self.chk_resume = QCheckBox(tr("auto_resume"))
-        self.chk_resume.setChecked(bool(self._config.get("auto_resume", True)))
-        form.addRow("", self.chk_resume)
+        self.chk_resume.setChecked(bool(self._config.get("auto_resume")))
+        form.addRow(self.chk_resume)
+
+        self.chk_album_continuation = QCheckBox(tr("album_continuation"))
+        self.chk_album_continuation.setChecked(
+            bool(self._config.get("album_continuation"))
+        )
+        self.chk_album_continuation.setToolTip(tr("album_continuation_hint"))
+        form.addRow(self.chk_album_continuation)
 
         v.addLayout(form)
         v.addStretch(1)
@@ -414,6 +421,7 @@ class SettingsDialog(QDialog):
         self._config.set("playlist_locations", self.collected_playlist_locations())
         self._config.set("volume", self.slider_vol.value())
         self._config.set("auto_resume", self.chk_resume.isChecked())
+        self._config.set("album_continuation", self.chk_album_continuation.isChecked())
         self._config.set("language", self.combo_language.currentData() or "en")
         set_language(str(self._config.get("language", "en")))
         self._config.save()

@@ -21,12 +21,14 @@ def main() -> int:
     from PyQt6.QtWidgets import QApplication
 
     from ui.main_window import MainWindow
+    from ui.tooltips import HoverToolTips
 
     QApplication.setApplicationName("WMplayer")
     QApplication.setOrganizationName("WMplayer")
 
     # Let Qt 6 configure per-monitor DPI awareness before creating any windows.
     app = QApplication(sys.argv)
+    HoverToolTips(app)
     app.setWindowIcon(QIcon(os.path.join(_HERE, "assets", "wmplayer.ico")))
     win = MainWindow()
     win.show()

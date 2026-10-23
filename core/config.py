@@ -48,10 +48,12 @@ DEFAULT_VOLUME = 100
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "volume": DEFAULT_VOLUME,
-    "play_mode": "sequential",
+    "shuffled": False,
+    "repeat": "none",
     "last_position_ms": 0,
     "last_track_path": "",
-    "auto_resume": True,
+    "auto_resume": False,
+    "album_continuation": True,
     "language": "en",
     "library_folders": [],
     "playlist_locations": [],
@@ -71,7 +73,15 @@ class Config:
         if os.path.isfile(CONFIG_PATH):
             try:
                 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                    self._data.update(json.load(f))
+                    data = json.load(f)
+                # Migrate the old combined mode once; persist only separate states.
+                old_mode = data.pop("play_mode", None)
+                if old_mode is not None:
+                    data.setdefault("shuffled", old_mode == "shuffle")
+                    data.setdefault("repeat", {
+                        "repeat_all": "all", "repeat_one": "one",
+                    }.get(old_mode, "none"))
+                self._data.update(data)
             except Exception:
                 pass
 
@@ -93,9 +103,6 @@ class Config:
 
     def set(self, key: str, value: Any) -> None:
         self._data[key] = value
-
-    def has(self, key: str) -> bool:
-        return key in self._data
 
     def mark_factory_reset(self) -> None:
         self._factory_reset_pending = True

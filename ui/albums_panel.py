@@ -55,7 +55,7 @@ class ElidedLabel(QLabel):
 
 
 class AlbumsPanel(QWidget):
-    play_paths_sequential = pyqtSignal(list, int)
+    play_album_requested = pyqtSignal(list, int, bool)
     play_paths_shuffled = pyqtSignal(list)
     enqueue_paths = pyqtSignal(list)
     play_next_paths = pyqtSignal(list)
@@ -286,16 +286,17 @@ class AlbumsPanel(QWidget):
     def _on_play_all(self) -> None:
         album = getattr(self, "_current_album", "")
         if album in self._albums_tracks:
-            self._play_from_album(album, 0)
+            self._play_from_album(album, 0, play_all=True)
 
-    def _play_from_album(self, album: str, track_index: int) -> None:
+    def _play_from_album(
+        self, album: str, track_index: int, *, play_all: bool = False
+    ) -> None:
         """Play within the current album."""
         tracks = self._albums_tracks.get(album, [])
         if not tracks:
             return
         paths = [t.path for t in tracks]
-        play_idx = max(0, min(track_index, len(paths) - 1))
-        self.play_paths_sequential.emit(paths, play_idx)
+        self.play_album_requested.emit(paths, track_index, play_all)
 
     def retranslate(self) -> None:
         if not self._embedded and hasattr(self, "title_label"):

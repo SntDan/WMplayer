@@ -50,7 +50,7 @@ from core.config import (
 from core.library import Library
 from core.metadata import read_metadata
 from core.media_controls import MediaControls
-from core.playlist import Playlist, PlayMode, RepeatMode
+from core.playlist import Playlist, RepeatMode
 from core.playlist_store import PlaylistStore
 
 from .albums_panel import AlbumsPanel
@@ -440,16 +440,14 @@ class MainWindow(QMainWindow):
         self.library_panel.open_album_requested.connect(self._open_album_from_search)
         self.library_panel.rescan_requested.connect(self._rescan_library)
 
-        self.albums_panel.play_paths_sequential.connect(self._play_paths_sequential_now)
+        self.albums_panel.play_album_requested.connect(self._play_album_now)
         self.albums_panel.enqueue_paths.connect(self._enqueue_paths)
         self.albums_panel.play_next_paths.connect(self._play_next_paths)
         self.albums_panel.add_paths_to_playlist.connect(
             self._add_paths_to_some_playlist
         )
 
-        self.artists_panel.play_paths_sequential.connect(
-            self._play_paths_sequential_now
-        )
+        self.artists_panel.play_album_requested.connect(self._play_album_now)
         self.artists_panel.play_paths_shuffled.connect(self._play_paths_shuffled_now)
         self.artists_panel.enqueue_paths.connect(self._enqueue_paths)
         self.artists_panel.play_next_paths.connect(self._play_next_paths)
@@ -567,21 +565,12 @@ class MainWindow(QMainWindow):
             self._library.scan_async()
 
     def _restore_playback_mode(self) -> None:
-        if self._config.has("shuffled") or self._config.has("repeat"):
-            try:
-                self._playlist.set_repeat(
-                    RepeatMode(self._config.get("repeat", "none"))
-                )
-            except Exception:
-                self._playlist.set_repeat(RepeatMode.NONE)
-            self._playlist.set_shuffled(bool(self._config.get("shuffled", False)))
-        else:
-            try:
-                self._playlist.set_mode(
-                    PlayMode(self._config.get("play_mode", "sequential"))
-                )
-            except Exception:
-                self._playlist.set_mode(PlayMode.SEQUENTIAL)
+        try:
+            repeat = RepeatMode(self._config.get("repeat"))
+        except (TypeError, ValueError):
+            repeat = RepeatMode.NONE
+        self._playlist.set_repeat(repeat)
+        self._playlist.set_shuffled(bool(self._config.get("shuffled")))
 
     def _restore_queue(self) -> None:
         if not os.path.isfile(QUEUE_CACHE_PATH):
@@ -610,7 +599,7 @@ class MainWindow(QMainWindow):
             return
         self._autoplay_after_load = False
         self._restore_position_ms = 0
-        if self._config.get("auto_resume", True):
+        if self._config.get("auto_resume"):
             try:
                 position = int(self._config.get("last_position_ms", 0))
                 self._restore_position_ms = max(0, position)
@@ -759,7 +748,6 @@ class MainWindow(QMainWindow):
             self._config.set("volume", self._engine.get_volume())
             self._config.set("shuffled", self._playlist.shuffled)
             self._config.set("repeat", self._playlist.repeat.value)
-            self._config.set("play_mode", self._playlist.mode.value)
             self._config.set("last_position_ms", self._engine.get_position())
             current = self._playlist.current
             self._config.set("last_track_path", current.path if current else "")
@@ -1018,20 +1006,27 @@ class MainWindow(QMainWindow):
         if len(self._playlist) > 0:
             self._play_index(new_start_index)
 
-    def _play_paths_sequential_now(
-        self, paths: List[str], start_index: int = 0
+    def _play_album_now(
+        self, paths: List[str], start_index: int = 0, play_all: bool = False
     ) -> None:
+        """Play an ordered album block, then continue the existing queue."""
         if not paths:
             return
-        self._playlist.set_mode(PlayMode.SEQUENTIAL)
-        self._play_paths_now(paths, start_index)
+        start_index = max(0, min(start_index, len(paths) - 1))
+        continue_album = play_all or self._config.get("album_continuation")
+        end_index = None if continue_album else start_index + 1
+        tracks = self._tracks_from_paths(paths[start_index:end_index])
+        index = self._playlist.replace_current(tracks)
+        if index >= 0:
+            self._play_index(index)
 
     def _play_paths_shuffled_now(self, paths: List[str]) -> None:
         if not paths:
             return
         tracks = self._tracks_from_paths(paths)
         self._playlist.replace_with_tracks(tracks, -1)
-        self._playlist.set_mode(PlayMode.SHUFFLE)
+        self._playlist.set_repeat(RepeatMode.NONE)
+        self._playlist.set_shuffled(True)
         if len(self._playlist) > 0:
             self._play_index(0)
 

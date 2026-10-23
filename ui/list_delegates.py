@@ -40,7 +40,6 @@ class CoverRowDelegate(QStyledItemDelegate):
     THUMB_PX = 52
     PAD = 10
     ROW_H = 52
-    HR_RESERVED_W = _HR_BADGE_SLOT_W + 12
 
     def sizeHint(self, option: QStyleOptionViewItem, index) -> QSize:  # noqa: N802
         if bool(index.data(ROLE_SECTION_HEADER)):
@@ -105,63 +104,53 @@ class CoverRowDelegate(QStyledItemDelegate):
             paint_hr_badge(painter, badge_rect)
             painter.restore()
 
-        text_x = thumb_rect.right() + self.PAD
-        text_w = badge_left - self.PAD - text_x
-        if text_w < 30:
+        rows = self.text_rows(option, index)
+        if not rows:
             painter.restore()
             return
-
-        title = index.data(Qt.ItemDataRole.DisplayRole) or ""
-        subtitle = index.data(ROLE_SUBTITLE) or ""
         is_playing = bool(index.data(ROLE_IS_PLAYING))
-
-        base_pt = self._base_pt(option.font)
-
-        title_font = QFont(option.font)
-        self._set_font_size(title_font, base_pt + 1)
-        if is_playing:
-            title_font.setBold(True)
-        painter.setFont(title_font)
-        painter.setPen(QColor("#E63946") if is_playing else QColor("#FFFFFF"))
-        title_fm = QFontMetrics(title_font)
-        title_h = title_fm.height()
-
-        sub_font = QFont(option.font)
-        self._set_font_size(sub_font, max(8, base_pt - 1))
-        sub_fm = QFontMetrics(sub_font)
-        sub_h = sub_fm.height()
-
-        block_h = title_h + 2 + sub_h
-        block_top = rect.top() + (self.THUMB_PX - block_h) // 2
-
-        title_rect = QRect(text_x, block_top, text_w, title_h)
-        elided_title = title_fm.elidedText(
-            str(title), Qt.TextElideMode.ElideRight, text_w
-        )
-        painter.drawText(
-            title_rect,
-            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
-            elided_title,
-        )
-
-        sub_rect = QRect(text_x, title_rect.bottom() + 2, text_w, sub_h)
-        painter.setFont(sub_font)
-        painter.setPen(QColor("#9A9A9A"))
-        elided_sub = sub_fm.elidedText(
-            str(subtitle), Qt.TextElideMode.ElideRight, text_w
-        )
-        painter.drawText(
-            sub_rect,
-            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
-            elided_sub,
-        )
+        for row, (text_rect, font, text) in enumerate(rows):
+            painter.setFont(font)
+            color = "#9A9A9A" if row else ("#E63946" if is_playing else "#FFFFFF")
+            painter.setPen(QColor(color))
+            visible = QFontMetrics(font).elidedText(
+                text, Qt.TextElideMode.ElideRight, text_rect.width()
+            )
+            painter.drawText(
+                text_rect,
+                Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+                visible,
+            )
 
         painter.setPen(_SEPARATOR_COLOR)
-        y = rect.bottom()
         # Keep the divider clear of the cover, which occupies the full row height.
-        painter.drawLine(text_x, y, rect.right(), y)
-
+        painter.drawLine(rows[0][0].left(), rect.bottom(), rect.right(), rect.bottom())
         painter.restore()
+
+    def text_rows(self, option: QStyleOptionViewItem, index):
+        """Share the painted text geometry with tooltip hit testing."""
+        if index.data(ROLE_SECTION_HEADER):
+            return []
+        text_x = option.rect.left() + self.THUMB_PX - 1 + self.PAD
+        text_w = option.rect.right() - 14 - _HR_BADGE_SLOT_W - self.PAD - text_x
+        if text_w < 30:
+            return []
+        base_pt = self._base_pt(option.font)
+        title_font = QFont(option.font)
+        self._set_font_size(title_font, base_pt + 1)
+        title_font.setBold(bool(index.data(ROLE_IS_PLAYING)) or title_font.bold())
+        sub_font = QFont(option.font)
+        self._set_font_size(sub_font, max(8, base_pt - 1))
+        title_h = QFontMetrics(title_font).height()
+        sub_h = QFontMetrics(sub_font).height()
+        block_h = title_h + 2 + sub_h
+        block_top = option.rect.top() + (self.THUMB_PX - block_h) // 2
+        title_rect = QRect(text_x, block_top, text_w, title_h)
+        sub_rect = QRect(text_x, title_rect.bottom() + 2, text_w, sub_h)
+        return [
+            (title_rect, title_font, str(index.data(Qt.ItemDataRole.DisplayRole) or "")),
+            (sub_rect, sub_font, str(index.data(ROLE_SUBTITLE) or "")),
+        ]
 
     @classmethod
     def _paint_section_header(

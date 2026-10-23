@@ -13,41 +13,10 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from core.metadata import TrackMetadata
 
 
-class PlayMode(Enum):
-    """Legacy combined playback mode."""
-
-    SEQUENTIAL = "sequential"
-    REPEAT_ONE = "repeat_one"
-    REPEAT_ALL = "repeat_all"
-    SHUFFLE = "shuffle"
-
-
 class RepeatMode(Enum):
     NONE = "none"
     ALL = "all"
     ONE = "one"
-
-
-def _legacy_to_components(mode: PlayMode) -> tuple[bool, RepeatMode]:
-    """Convert a legacy mode into shuffle and repeat state."""
-    if mode == PlayMode.SHUFFLE:
-        return True, RepeatMode.NONE
-    if mode == PlayMode.REPEAT_ALL:
-        return False, RepeatMode.ALL
-    if mode == PlayMode.REPEAT_ONE:
-        return False, RepeatMode.ONE
-    return False, RepeatMode.NONE
-
-
-def _components_to_legacy(shuffled: bool, repeat: RepeatMode) -> PlayMode:
-    """Convert shuffle and repeat state into a legacy mode."""
-    if shuffled:
-        return PlayMode.SHUFFLE
-    if repeat == RepeatMode.ALL:
-        return PlayMode.REPEAT_ALL
-    if repeat == RepeatMode.ONE:
-        return PlayMode.REPEAT_ONE
-    return PlayMode.SEQUENTIAL
 
 
 class Playlist(QObject):
@@ -55,7 +24,6 @@ class Playlist(QObject):
 
     changed = pyqtSignal()
     current_changed = pyqtSignal(int)
-    play_mode_changed = pyqtSignal(PlayMode)
     shuffled_changed = pyqtSignal(bool)
     repeat_changed = pyqtSignal(RepeatMode)
 
@@ -112,6 +80,26 @@ class Playlist(QObject):
         """Play these tracks after the current song, preserving selection order."""
         return self._insert_tracks(tracks, self._current_index + 1, play_next=True)
 
+    def replace_current(self, tracks: List[TrackMetadata]) -> int:
+        """Replace the current occurrence with an ordered block in one queue update."""
+        additions = [copy(track) for track in tracks]
+        if not additions:
+            return -1
+        current = self.current
+        index = max(0, self._current_index)
+        if self._original_order is not None:
+            original_index = next(
+                (i for i, track in enumerate(self._original_order) if track is current), -1
+            )
+            if original_index < 0:
+                self._original_order[:0] = additions
+            else:
+                self._original_order[original_index:original_index + 1] = additions
+        self._tracks[index:index + int(current is not None)] = additions
+        self._current_index = index
+        self.changed.emit()
+        return index
+
     def _insert_tracks(
         self, tracks: List[TrackMetadata], index: int, *, play_next: bool = False
     ) -> int:
@@ -134,7 +122,9 @@ class Playlist(QObject):
 
     def remove(self, index: int) -> None:
         if 0 <= index < len(self._tracks):
-            del self._tracks[index]
+            removed = self._tracks.pop(index)
+            if self._original_order is not None:
+                self._original_order = [t for t in self._original_order if t is not removed]
             if index == self._current_index:
                 self._current_index = -1
             elif index < self._current_index:
@@ -223,11 +213,6 @@ class Playlist(QObject):
     def repeat(self) -> RepeatMode:
         return self._repeat
 
-    @property
-    def mode(self) -> PlayMode:
-        """Legacy playback mode for persistence."""
-        return _components_to_legacy(self._shuffled, self._repeat)
-
     def set_shuffled(self, shuffled: bool) -> None:
         if shuffled == self._shuffled:
             return
@@ -237,20 +222,12 @@ class Playlist(QObject):
         else:
             self._exit_shuffle()
         self.shuffled_changed.emit(shuffled)
-        self.play_mode_changed.emit(self.mode)
 
     def set_repeat(self, repeat: RepeatMode) -> None:
         if repeat == self._repeat:
             return
         self._repeat = repeat
         self.repeat_changed.emit(repeat)
-        self.play_mode_changed.emit(self.mode)
-
-    def set_mode(self, mode: PlayMode) -> None:
-        """Set playback state from a legacy mode."""
-        shuffled, repeat = _legacy_to_components(mode)
-        self.set_repeat(repeat)
-        self.set_shuffled(shuffled)
 
     def _enter_shuffle(self) -> None:
         if not self._tracks:
