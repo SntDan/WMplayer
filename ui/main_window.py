@@ -608,10 +608,7 @@ class MainWindow(QMainWindow):
             index = self._playlist.find_index_by_path(last_path) if last_path else -1
         if index < 0:
             return
-        self._autoplay_after_load = bool(
-            self._config.get("auto_resume", True)
-            and self._config.get("last_playing", False)
-        )
+        self._autoplay_after_load = False
         self._restore_position_ms = 0
         if self._config.get("auto_resume", True):
             try:
@@ -764,7 +761,6 @@ class MainWindow(QMainWindow):
             self._config.set("repeat", self._playlist.repeat.value)
             self._config.set("play_mode", self._playlist.mode.value)
             self._config.set("last_position_ms", self._engine.get_position())
-            self._config.set("last_playing", self._engine.is_playing())
             current = self._playlist.current
             self._config.set("last_track_path", current.path if current else "")
             self._config.set("last_queue_index", self._playlist.current_index)

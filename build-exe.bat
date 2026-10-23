@@ -5,6 +5,7 @@ pushd "%~dp0"
 if errorlevel 1 exit /b 1
 
 set "WMPLAYER_BUILD_EXE=%CD%\dist\WMplayer.exe"
+set "WMPLAYER_BUILD_SOURCE=%CD%\WMplayer.py"
 set "WMPLAYER_SPEC_DIR=%CD%\build\spec"
 set "WMPLAYER_PYTHON_ARGS="
 
@@ -64,13 +65,16 @@ if not exist "%WMPLAYER_SPEC_DIR%\" (
     goto failed
 )
 
-echo [2/3] Closing "%WMPLAYER_BUILD_EXE%" if running...
-rem Match the full executable path so other copies of WMplayer are untouched.
+echo [2/3] Closing running instances from this project...
+rem Match this project's executable or Python entry point, including pythonw.
 rem Ask all instances to close first; force their process trees only if needed.
 powershell.exe -NoProfile -NonInteractive -Command ^
     "$ErrorActionPreference = 'Stop'; try {" ^
-    "$players = @(Get-Process -Name 'WMplayer' -ErrorAction SilentlyContinue | Where-Object { $_.Path -and [string]::Equals($_.Path, $env:WMPLAYER_BUILD_EXE, [System.StringComparison]::OrdinalIgnoreCase) });" ^
-    "foreach ($player in $players) { if (-not $player.HasExited) { $null = $player.CloseMainWindow() } };" ^
+    "$source = '(?:' + [regex]::Escape($env:WMPLAYER_BUILD_SOURCE) + '|' + [regex]::Escape($env:WMPLAYER_BUILD_SOURCE.Replace('\', '/')) + ')';" ^
+    "$sourcePattern = '^\s*(?:\x22[^\x22]+\x22|\S+)\s+(?:-[uOBEsI]+\s+)*(?:\x22' + $source + '\x22|' + $source + ')(?:\s|$)';" ^
+    "$targets = @(Get-CimInstance Win32_Process | Where-Object { ($_.Name -ieq 'WMplayer.exe' -and [string]::Equals($_.ExecutablePath, $env:WMPLAYER_BUILD_EXE, [System.StringComparison]::OrdinalIgnoreCase)) -or ($_.Name -match '^python(?:\d+(?:\.\d+)?)?w?\.exe$' -and $_.CommandLine -match $sourcePattern) });" ^
+    "$players = @($targets | ForEach-Object { Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue });" ^
+    "foreach ($player in $players) { if (-not $player.HasExited) { Write-Host ('Closing ' + $player.ProcessName + ' (PID ' + $player.Id + ')'); $null = $player.CloseMainWindow() } };" ^
     "foreach ($player in $players) { if (-not $player.HasExited -and -not $player.WaitForExit(5000)) { & taskkill.exe /PID $player.Id /T /F; if ($LASTEXITCODE -ne 0 -and -not $player.HasExited) { throw 'Could not stop WMplayer.' }; if (-not $player.WaitForExit(5000)) { throw 'WMplayer did not exit.' } } };" ^
     "exit 0 } catch { Write-Error $_; exit 1 }"
 if errorlevel 1 goto failed

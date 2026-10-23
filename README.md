@@ -137,7 +137,7 @@ Plain text lyric files can also be displayed and scrolled manually, but they do 
 
 ## Build
 
-On Windows, run `build-exe.bat` from the project folder. It checks Python, dependencies, and the app icon, then closes this project's running `dist\WMplayer.exe`. It builds from the current `WMplayer.py` with the app icon and generates a fresh spec under `build\spec`, ignoring any old root `WMplayer.spec`. The output is `dist\WMplayer.exe`.
+On Windows, run `build-exe.bat` from the project folder. It checks Python, dependencies, and the app icon, then closes this project's running `dist\WMplayer.exe` and any instances launched from this project's `WMplayer.py` with Python or pythonw. It requests a normal close to save the session, then terminates any remaining process trees after a timeout. It builds from the current `WMplayer.py` with the app icon and generates a fresh spec under `build\spec`, ignoring any old root `WMplayer.spec`. The output is `dist\WMplayer.exe`.
 
 ```bash
 python -m PyInstaller --noconfirm --clean --onefile --windowed --name WMplayer --icon "assets/wmplayer.ico" --add-data "assets/wmplayer.ico;assets" --specpath "build/spec" --workpath "build/pyinstaller" WMplayer.py
@@ -286,7 +286,7 @@ Song.lrc
 
 ## 打包
 
-Windows 下双击项目目录中的 `build-exe.bat`：脚本会检查 Python、依赖和应用图标，再关闭正在运行的本项目 `dist\WMplayer.exe`。脚本直接从当前 `WMplayer.py` 打包并包含应用图标，在 `build\spec` 中重新生成配置，不再读取根目录残留的 `WMplayer.spec`。输出为 `dist\WMplayer.exe`。
+Windows 下双击项目目录中的 `build-exe.bat`：脚本会检查 Python、依赖和应用图标，再关闭正在运行的本项目 `dist\WMplayer.exe`，以及通过 Python 或 pythonw 启动的本项目 `WMplayer.py`。脚本先请求正常关闭以保存状态，超时后再强制结束残留进程树。脚本直接从当前 `WMplayer.py` 打包并包含应用图标，在 `build\spec` 中重新生成配置，不再读取根目录残留的 `WMplayer.spec`。输出为 `dist\WMplayer.exe`。
 
 ```bash
 python -m PyInstaller --noconfirm --clean --onefile --windowed --name WMplayer --icon "assets/wmplayer.ico" --add-data "assets/wmplayer.ico;assets" --specpath "build/spec" --workpath "build/pyinstaller" WMplayer.py
