@@ -2,7 +2,7 @@
 
 [English](#english) | [中文](#中文)
 
-![WMplayer queue view](assets/screenshot.png)
+![WMplayer queue view](assets/queue.png)
 
 ---
 
@@ -31,7 +31,7 @@ It uses mpv for playback, reads metadata with mutagen, and supports common lossl
 
 ### Queue
 
-![Queue view](assets/screenshot.png)
+![Queue view](assets/queue.png)
 
 ### Search
 
@@ -180,7 +180,7 @@ WMplayer 是一个用 Python 和 PyQt6 写的本地桌面音乐播放器。它�
 
 ### 播放队列
 
-![播放队列界面](assets/screenshot.png)
+![播放队列界面](assets/queue.png)
 
 ### 搜索
 
