@@ -80,26 +80,6 @@ class Playlist(QObject):
         """Play these tracks after the current song, preserving selection order."""
         return self._insert_tracks(tracks, self._current_index + 1, play_next=True)
 
-    def replace_current(self, tracks: List[TrackMetadata]) -> int:
-        """Replace the current occurrence with an ordered block in one queue update."""
-        additions = [copy(track) for track in tracks]
-        if not additions:
-            return -1
-        current = self.current
-        index = max(0, self._current_index)
-        if self._original_order is not None:
-            original_index = next(
-                (i for i, track in enumerate(self._original_order) if track is current), -1
-            )
-            if original_index < 0:
-                self._original_order[:0] = additions
-            else:
-                self._original_order[original_index:original_index + 1] = additions
-        self._tracks[index:index + int(current is not None)] = additions
-        self._current_index = index
-        self.changed.emit()
-        return index
-
     def _insert_tracks(
         self, tracks: List[TrackMetadata], index: int, *, play_next: bool = False
     ) -> int:

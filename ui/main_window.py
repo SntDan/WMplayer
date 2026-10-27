@@ -1028,8 +1028,8 @@ class MainWindow(QMainWindow):
         continue_album = play_all or self._config.get("album_continuation")
         end_index = None if continue_album else start_index + 1
         tracks = self._tracks_from_paths(paths[start_index:end_index])
-        index = self._playlist.replace_current(tracks)
-        if index >= 0:
+        index = self._playlist.current_index + 1
+        if self._playlist.insert_next(tracks):
             self._play_index(index)
 
     def _play_paths_shuffled_now(self, paths: List[str]) -> None:
