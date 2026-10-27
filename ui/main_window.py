@@ -15,7 +15,6 @@ from PyQt6.QtCore import (
     QSize,
     Qt,
     QThreadPool,
-    QTimer,
     QVariantAnimation,
     qWarning,
     pyqtSignal,
@@ -612,46 +611,8 @@ class MainWindow(QMainWindow):
                 pass
         self._playlist.set_current(0)
 
-    def _view_searches(self) -> dict:
-        return {
-            "library": (self.library_panel.search, self.library_panel),
-            "queue": (self.queue_panel.search, self.queue_panel),
-            "artists": (self.artists_panel.search_box, self.artists_panel),
-            "albums": (self.albums_panel.search_box, self.albums_panel),
-        }
-
-    def _view_lists(self) -> dict:
-        subpanel = self.artists_panel.albums_subpanel
-        return {
-            "library": self.library_panel.list,
-            "queue": self.queue_panel.list,
-            "artists": self.artists_panel.list_artists,
-            "artist_albums": subpanel.list_albums,
-            "artist_tracks": subpanel.list_tracks,
-            "albums": self.albums_panel.list_albums,
-            "album_tracks": self.albums_panel.list_tracks,
-            "playlists": self.playlists_panel.list,
-        }
-
     def _save_view_state(self) -> None:
-        subpanel = self.artists_panel.albums_subpanel
-        self._config.set("right_panel_state", {
-            "view": self.stack.currentIndex(),
-            "searches": {
-                key: editor.text() for key, (editor, _) in self._view_searches().items()
-            },
-            "album": self.albums_panel._current_album
-            if self.albums_panel.stack.currentIndex() == 1 else None,
-            "album_artist": self.albums_panel._current_artist,
-            "artist": subpanel._filter_artist
-            if self.artists_panel.stack.currentIndex() == 1 else None,
-            "artist_album": subpanel._current_album
-            if subpanel.stack.currentIndex() == 1 else None,
-            "scrolls": {
-                key: widget.verticalScrollBar().value()
-                for key, widget in self._view_lists().items()
-            },
-        })
+        self._config.set("right_panel_state", {"view": self.stack.currentIndex()})
         geometry = bytes(self.saveGeometry().toBase64()).decode("ascii")
         self._config.set("window_geometry", geometry)
 
@@ -667,38 +628,6 @@ class MainWindow(QMainWindow):
         if not isinstance(view, int) or not 0 <= view < self.stack.count():
             view = self.VIEW_QUEUE
         self._switch_view(view)
-        searches = state.get("searches", {})
-        if isinstance(searches, dict):
-            for key, (editor, panel) in self._view_searches().items():
-                text = searches.get(key, "")
-                if isinstance(text, str):
-                    editor.setText(text)
-                    panel._search_timer.stop()
-                    panel._apply_filter(text)
-        album = state.get("album")
-        if isinstance(album, str) and album in self.albums_panel._albums_tracks:
-            album_artist = state.get("album_artist")
-            self.albums_panel.show_album(album, album_artist if isinstance(album_artist, str) else None)
-        artist = state.get("artist")
-        if isinstance(artist, str) and any(
-            self.artists_panel.list_artists.item(i).data(Qt.ItemDataRole.UserRole) == artist
-            for i in range(self.artists_panel.list_artists.count())
-        ):
-            self.artists_panel.show_artist(artist)
-            subpanel = self.artists_panel.albums_subpanel
-            album = state.get("artist_album")
-            if isinstance(album, str) and album in subpanel._albums_tracks:
-                subpanel.show_album(album)
-        scrolls = state.get("scrolls", {})
-        if isinstance(scrolls, dict):
-            # Apply after the restored page has its final layout and scroll range.
-            QTimer.singleShot(0, lambda: self._restore_view_scrolls(scrolls))
-
-    def _restore_view_scrolls(self, scrolls: dict) -> None:
-        for key, widget in self._view_lists().items():
-            value = scrolls.get(key)
-            if isinstance(value, int):
-                widget.verticalScrollBar().setValue(value)
 
     def event(self, e):
         if (
