@@ -585,15 +585,21 @@ class MainWindow(QMainWindow):
         original_tracks = (
             self._tracks_from_paths(original_paths) if original_paths else None
         )
-        self._playlist.restore_with_tracks(
-            self._tracks_from_paths(paths), original_tracks
-        )
-
+        tracks = self._tracks_from_paths(paths)
         last_path = self._config.get("last_track_path", "")
         index = self._config.get("last_queue_index", -1)
-        track = self._playlist.get(index) if isinstance(index, int) else None
+        track = (
+            tracks[index]
+            if isinstance(index, int) and 0 <= index < len(tracks)
+            else None
+        )
         if track is None or track.path != last_path:
-            index = self._playlist.find_index_by_path(last_path) if last_path else -1
+            index = next(
+                (i for i, track in enumerate(tracks) if track.path == last_path), -1
+            ) if last_path else -1
+        self._playlist.restore_with_tracks(
+            tracks, original_tracks, skip_before=max(0, index)
+        )
         if index < 0:
             return
         self._autoplay_after_load = False
@@ -604,7 +610,7 @@ class MainWindow(QMainWindow):
                 self._restore_position_ms = max(0, position)
             except (TypeError, ValueError):
                 pass
-        self._playlist.set_current(index)
+        self._playlist.set_current(0)
 
     def _view_searches(self) -> dict:
         return {

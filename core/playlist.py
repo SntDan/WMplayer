@@ -57,8 +57,10 @@ class Playlist(QObject):
         self,
         tracks: List[TrackMetadata],
         original_tracks: Optional[List[TrackMetadata]] = None,
+        *,
+        skip_before: int = 0,
     ) -> None:
-        """Restore a parsed queue snapshot."""
+        """Restore a queue snapshot, optionally omitting past occurrences."""
         self._tracks = [copy(track) for track in tracks]
         self._original_order = None
         if original_tracks:
@@ -69,6 +71,13 @@ class Playlist(QObject):
             for track in original_tracks:
                 if occurrences[track.path]:
                     self._original_order.append(occurrences[track.path].popleft())
+        if skip_before > 0:
+            self._tracks = self._tracks[skip_before:]
+            if self._original_order is not None:
+                remaining_ids = {id(track) for track in self._tracks}
+                self._original_order = [
+                    track for track in self._original_order if id(track) in remaining_ids
+                ]
         self._current_index = -1
         self.changed.emit()
 
