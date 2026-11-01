@@ -13,7 +13,7 @@ from core.thumbnails import ensure_thumb, thumb_exists
 
 
 def album_track_sort_key(track: TrackMetadata) -> tuple:
-    return track.track_number if track.track_number > 0 else 9999, track.title or ""
+    return track.disc_number or 1, track.track_number or 9999, track.title or ""
 
 
 class _ScanSignals(QObject):
@@ -103,12 +103,13 @@ def _metadata_for_scan(
 
 def _cache_entry_is_current(cached: Optional[dict], mtime: float) -> bool:
     return bool(
-        cached and abs(cached.get("mtime", 0) - mtime) < 1 and "track_number" in cached
+        cached and abs(cached.get("mtime", 0) - mtime) < 1
+        and all(name in cached for name in _INTEGER_FIELDS)
     )
 
 
 _TEXT_FIELDS = ("title", "artist", "album")
-_INTEGER_FIELDS = ("duration_ms", "sample_rate", "bits_per_sample", "track_number")
+_INTEGER_FIELDS = ("duration_ms", "sample_rate", "bits_per_sample", "track_number", "disc_number")
 
 
 def _metadata_from_cache(path: str, cached: dict) -> TrackMetadata:
@@ -173,17 +174,6 @@ class Library(QObject):
             self._path_map = {t.path: t for t in self._tracks}
         return self._path_map.get(path)
 
-    def album_tracks(self, track: TrackMetadata) -> List[TrackMetadata]:
-        """Return the complete album for a library song in track order."""
-        album = (track.album or "").strip()
-        artist = (track.artist or "").strip()
-        return sorted(
-            (item for item in self._display_tracks
-             if (item.album or "").strip() == album
-             and (item.artist or "").strip() == artist),
-            key=album_track_sort_key,
-        )
-
     def _rebuild_display(self) -> None:
         """Build the deduplicated library view."""
         best: Dict[tuple, TrackMetadata] = {}
@@ -192,6 +182,7 @@ class Library(QObject):
                 (t.title or "").strip().lower(),
                 (t.artist or "").strip().lower(),
                 (t.album or "").strip().lower(),
+                t.disc_number or 1,
             )
             if key not in best or _spec_score(t) > _spec_score(best[key]):
                 best[key] = t
@@ -233,6 +224,9 @@ class Library(QObject):
             with open(self._cache_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except Exception:
+            return
+        # Rebuild legacy indexes asynchronously on startup to read disc numbers.
+        if any("disc_number" not in entry for entry in data.get("tracks", [])):
             return
         self._folders = [os.path.abspath(p) for p in data.get("folders", []) if p]
         for entry in data.get("tracks", []):

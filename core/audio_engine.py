@@ -389,6 +389,12 @@ class AudioEngine(QObject):
     def play(self) -> None:
         if self._player is None or self._current_path is None:
             return
+        if self._stopping:
+            position_ms = self._position_ms
+            if not self.load(self._current_path):
+                return
+            if position_ms > 0:
+                self.seek(position_ms)
         if self._pending_seek_ms is not None:
             self._play_after_seek = True
             return
@@ -424,6 +430,7 @@ class AudioEngine(QObject):
             self._clear_preload()
             self._player.command("stop", timeout=0.8)
             self._playing = False
+            self._file_loaded = False
             self._position_ms = 0
             self._last_position_sync = time.monotonic()
             self.position_changed.emit(0)

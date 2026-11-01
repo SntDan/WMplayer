@@ -429,7 +429,6 @@ class MainWindow(QMainWindow):
             self._on_save_queue_as_playlist
         )
 
-        self.library_panel.play_track_requested.connect(self._play_library_track_now)
         self.library_panel.play_paths_now.connect(self._play_paths_now)
         self.library_panel.enqueue_paths.connect(self._enqueue_paths)
         self.library_panel.play_next_paths.connect(self._play_next_paths)
@@ -711,6 +710,7 @@ class MainWindow(QMainWindow):
             self._engine.pause()
         else:
             self._engine.play()
+            self._preload_next_track()
 
     def _play_index(self, index: int) -> None:
         self._autoplay_after_load = True
@@ -851,11 +851,13 @@ class MainWindow(QMainWindow):
 
     def _on_remove_track(self, index: int) -> None:
         was_current = index == self._playlist.current_index
+        was_playing = self._engine.is_playing()
         self._playlist.remove(index)
         if was_current:
             if len(self._playlist) > 0:
                 next_idx = min(index, len(self._playlist) - 1)
-                self._play_index(next_idx)
+                self._autoplay_after_load = was_playing
+                self._playlist.set_current(next_idx)
             else:
                 self._engine.stop()
                 self.player_panel.set_track(None, -1, 0)
@@ -934,24 +936,13 @@ class MainWindow(QMainWindow):
                     pass
         return tracks
 
-    def _play_library_track_now(self, path: str) -> None:
-        track = self._library.find_by_path(path)
-        if track is None:
-            return
-        paths = [item.path for item in self._library.album_tracks(track)]
-        try:
-            index = paths.index(path)
-        except ValueError:
-            return
-        self._play_album_now(paths, index)
-
-    def _play_paths_now(self, paths: List[str], start_index: int = 0) -> None:
+    def _play_paths_now(self, paths: List[str]) -> None:
+        """Insert the requested songs after the current song and start them."""
         if not paths:
             return
-        tracks = self._tracks_from_paths(paths)
-        new_start_index = self._playlist.replace_with_tracks(tracks, start_index)
-        if len(self._playlist) > 0:
-            self._play_index(new_start_index)
+        index = self._playlist.current_index + 1
+        if self._playlist.insert_next(self._tracks_from_paths(paths)):
+            self._play_index(index)
 
     def _play_album_now(
         self, paths: List[str], start_index: int = 0, play_all: bool = False
@@ -962,10 +953,7 @@ class MainWindow(QMainWindow):
         start_index = max(0, min(start_index, len(paths) - 1))
         continue_album = play_all or self._config.get("album_continuation")
         end_index = None if continue_album else start_index + 1
-        tracks = self._tracks_from_paths(paths[start_index:end_index])
-        index = self._playlist.current_index + 1
-        if self._playlist.insert_next(tracks):
-            self._play_index(index)
+        self._play_paths_now(paths[start_index:end_index])
 
     def _play_paths_shuffled_now(self, paths: List[str]) -> None:
         if not paths:

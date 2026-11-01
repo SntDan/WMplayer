@@ -40,6 +40,7 @@ class TrackMetadata:
     sample_rate: int = 0
     bits_per_sample: int = 0
     track_number: int = 0
+    disc_number: int = 0
     cover: Optional[bytes] = field(default=None, repr=False)
 
     @property
@@ -99,14 +100,12 @@ def read_metadata(path: str, with_cover: bool = True) -> TrackMetadata:
             md.artist = artist
         if album:
             md.album = album
-        track_raw = _first_tag(
+        md.track_number = _number_tag(
             audio, ["TRCK", "tracknumber", "TRACKNUMBER", "trkn", "WM/TrackNumber"]
         )
-        if track_raw:
-            try:
-                md.track_number = int(str(track_raw).split("/")[0].strip())
-            except (ValueError, TypeError):
-                pass
+        md.disc_number = _number_tag(
+            audio, ["TPOS", "discnumber", "DISCNUMBER", "disk", "WM/PartOfSet"]
+        )
     except Exception:
         pass
 
@@ -117,6 +116,13 @@ def read_metadata(path: str, with_cover: bool = True) -> TrackMetadata:
             md.cover = None
 
     return md
+
+
+def _number_tag(audio, keys) -> int:
+    try:
+        return max(0, int((_first_tag(audio, keys) or "0").split("/")[0].strip()))
+    except (ValueError, TypeError):
+        return 0
 
 
 def _first_tag(audio, keys) -> Optional[str]:

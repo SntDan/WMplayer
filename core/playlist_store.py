@@ -84,7 +84,7 @@ class PlaylistStore(QObject):
         if not name:
             return False
         safe = _safe_filename(name)
-        target = os.path.join(self._default_dir, safe + ".m3u8")
+        target = self._writable_path(safe) or os.path.join(self._default_dir, safe + ".m3u8")
         ok = m3u.write_file(target, name, paths)
         if ok:
             self.changed.emit()

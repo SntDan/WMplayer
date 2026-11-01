@@ -37,8 +37,7 @@ from ui.theme import BTN_QSS as _BTN_QSS
 
 
 class LibraryPanel(QWidget):
-    play_track_requested = pyqtSignal(str)
-    play_paths_now = pyqtSignal(list, int)
+    play_paths_now = pyqtSignal(list)
     enqueue_paths = pyqtSignal(list)
     play_next_paths = pyqtSignal(list)
     add_paths_to_playlist = pyqtSignal(list)
@@ -244,7 +243,7 @@ class LibraryPanel(QWidget):
         if not path:
             return
 
-        self.play_track_requested.emit(path)
+        self.play_paths_now.emit([path])
 
     def _on_context_menu(self, pos) -> None:
         item = self.list.itemAt(pos)
@@ -277,7 +276,7 @@ class LibraryPanel(QWidget):
         if not paths:
             return
         if act == a_play:
-            self.play_paths_now.emit(paths, 0)
+            self.play_paths_now.emit(paths)
         elif act == a_next:
             self.play_next_paths.emit(paths)
         elif act == a_enq:
@@ -335,10 +334,11 @@ def _artist_track_sort_key(track) -> tuple:
 
 
 def _song_search_sort_key(track) -> tuple:
-    number, title = album_track_sort_key(track)
+    disc, number, title = album_track_sort_key(track)
     return (
         (track.artist or "").lower(),
         (track.album or "").lower(),
+        disc,
         number,
         title.lower(),
     )
