@@ -32,6 +32,24 @@ PRIMARY_BTN_QSS = (
 )
 
 
+CONTEXT_MENU_QSS = """
+QMenu {
+    background-color: #171717;
+    border: 1px solid #454545;
+    border-radius: 8px;
+    padding: 5px;
+}
+QMenu::item {
+    background-color: transparent;
+    border-radius: 4px;
+    padding: 6px 10px;
+}
+QMenu::item:selected {
+    background-color: #303030;
+}
+"""
+
+
 PAGE_TITLE_QSS = "font-size: 20px; font-weight: bold;"
 
 

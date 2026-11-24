@@ -8,7 +8,6 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QListWidgetItem,
-    QMenu,
     QPushButton,
     QSizePolicy,
     QStackedWidget,
@@ -34,6 +33,7 @@ from ui.list_helpers import (
     track_item,
 )
 from ui.theme import PRIMARY_BTN_QSS
+from ui.widgets import ContextMenu
 
 
 class ElidedLabel(QLabel):
@@ -278,7 +278,7 @@ class AlbumsPanel(QWidget):
         paths = [self.list_tracks.item(i).data(Qt.ItemDataRole.UserRole)
                  for i in range(self.list_tracks.count())
                  if self.list_tracks.item(i).isSelected()]
-        menu = QMenu(self)
+        menu = ContextMenu(self)
         play_next = menu.addAction(tr("play_next"))
         play_last = menu.addAction(tr("play_last"))
         action = menu.exec(self.list_tracks.viewport().mapToGlobal(pos))

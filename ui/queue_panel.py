@@ -12,7 +12,6 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
-    QMenu,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -29,6 +28,7 @@ from ui.list_helpers import (
     track_item,
 )
 from ui.theme import BTN_QSS as _BTN_QSS
+from ui.widgets import ContextMenu
 
 
 class QueuePanel(QWidget):
@@ -133,7 +133,7 @@ class QueuePanel(QWidget):
         item = self.list.itemAt(pos)
         if item is None:
             return
-        menu = QMenu(self)
+        menu = ContextMenu(self)
         a_play = menu.addAction(tr("play"))
         a_remove = menu.addAction(tr("remove_from_queue"))
         act = menu.exec(self.list.mapToGlobal(pos))

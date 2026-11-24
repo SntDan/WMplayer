@@ -26,10 +26,10 @@ try:
 
 except ImportError:  # pragma: no cover
     QSvgRenderer = None  # type: ignore[assignment]
-from PyQt6.QtWidgets import QLabel, QPushButton, QSizePolicy, QWidget
+from PyQt6.QtWidgets import QLabel, QMenu, QPushButton, QSizePolicy, QWidget
 
 from .hr_badge import HR_BADGE_HEIGHT, HR_BADGE_WIDTH, paint_hr_badge
-from .theme import Theme
+from .theme import CONTEXT_MENU_QSS, Theme
 
 LUCIDE_STROKE: dict[str, str] = {
     "library": (
@@ -116,6 +116,17 @@ def _draw_lucide_icon(
     painter.save()
     _svg_renderer(svg).render(painter, target)
     painter.restore()
+
+
+class ContextMenu(QMenu):
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent)
+        self.setWindowFlag(Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setStyleSheet(CONTEXT_MENU_QSS)
+        self.ensurePolished()
+        # The Windows 11 Qt style adds a shadow that clips at the rounded corners.
+        self.setGraphicsEffect(None)
 
 
 class IconButton(QPushButton):

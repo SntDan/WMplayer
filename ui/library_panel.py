@@ -11,7 +11,6 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
-    QMenu,
     QProgressBar,
     QPushButton,
     QVBoxLayout,
@@ -34,6 +33,7 @@ from ui.list_helpers import (
     suspended_updates,
 )
 from ui.theme import BTN_QSS as _BTN_QSS
+from ui.widgets import ContextMenu
 
 
 class LibraryPanel(QWidget):
@@ -252,7 +252,7 @@ class LibraryPanel(QWidget):
         if not item.isSelected():
             self.list.setCurrentItem(item)
         kind = item.data(self._ROLE_RESULT_KIND)
-        menu = QMenu(self)
+        menu = ContextMenu(self)
         a_open = None
         a_play = a_next = a_enq = a_add = None
         if kind == "artist":

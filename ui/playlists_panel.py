@@ -10,7 +10,6 @@ from PyQt6.QtWidgets import (
     QInputDialog,
     QLabel,
     QListWidgetItem,
-    QMenu,
     QMessageBox,
     QSizePolicy,
     QVBoxLayout,
@@ -22,6 +21,7 @@ from core.thumbnails import thumb_path_for
 from ui.i18n import tr
 from ui.list_delegates import ROLE_SUBTITLE, ROLE_THUMB_PATHS
 from ui.list_helpers import add_list_header, cover_list, suspended_updates
+from ui.widgets import ContextMenu
 
 
 class _DirectoryLabel(QLabel):
@@ -113,7 +113,7 @@ class PlaylistsPanel(QWidget):
         if item is None:
             return
         name = item.data(Qt.ItemDataRole.UserRole)
-        menu = QMenu(self)
+        menu = ContextMenu(self)
         a_open = menu.addAction(tr("load_and_play"))
         a_rename = menu.addAction(tr("rename"))
         a_del = menu.addAction(tr("delete"))
